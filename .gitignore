@@ -1,0 +1,4 @@
+# Local PostgreSQL development tools and data
+.devtools/
+.devdata/
+

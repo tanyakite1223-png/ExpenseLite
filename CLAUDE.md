@@ -1,6 +1,6 @@
 # CLAUDE.md — ExpenseLite(AI 協作練習・第一階段:Vibe Coding)
 
-> 版本:v1.0(定版)
+> 版本:v1.1(PostgreSQL 決策更新)
 > 適用範圍:本 repo。與「ExpenseSystem 學習專案」、「ASP.NET Core 學習筆記」兩個 repo 互不相干,請勿跨 repo 操作。
 > （`ExpenseLite` 為暫定專案名,Amber 可自行更換。）
 
@@ -9,7 +9,7 @@
 ## 1. 這個專案是什麼
 
 - 這是 Amber 的「AI 協作開發練習・第一階段」,練習方式是 **vibe coding**:由 Amber 主導方向與決策,由你（AI）負責把功能實作出來、跑得起來。
-- 假想目標:一間以人工作業（頂多 Excel 輔助）處理報銷的小型公司,做一套「員工墊款報銷」系統,把混亂的人工流程整理成可用的軟體。
+- 假想目標:一間約 10 人內、主要做品牌形象設計、員工使用 Mac 的小型公司,目前以人工作業（頂多 Excel 輔助）處理報銷;本專案要做一套「員工墊款報銷」系統,把混亂的人工流程整理成可用的軟體。
 - 第二階段會用 SDD（Spec-Driven Development,規格驅動開發）把同一套系統重做一次。所以本階段重點是「體驗 AI 協作、快速做出可運作的東西」,**不是追求架構完美,不要過度設計**。
 - 系統「要做什麼功能、長什麼樣子」是 **留給 Amber 規劃** 的空間,本檔不預先規定系統規格,只給領域(報銷)與架構規範。
 - 但本專案有一個刻意的設計:**透過 AI 協作,讓 Amber 接觸到她現階段自己不容易學到的「分層與領域模型架構」**。心智模型是——公司事先把架構規範寫在這份 CLAUDE.md 裡,你（AI）照規範實作並解講,Amber 負責 review。她一邊 vibe coding 規劃系統,一邊看到並讀懂優良架構。
@@ -30,8 +30,10 @@
 - 框架:ASP.NET Core（.NET 10),以 MVC 為主;需要時可加 Web API
 - 前端:Server-side Razor + 必要的原生 HTML / CSS / JavaScript。**不要** 自行引入 React / Vue / Angular 等 SPA 框架
 - ORM:EF Core
-- 資料庫:開發階段用 SQL Server LocalDB（`(localdb)\MSSQLLocalDB`);未來若真的要提供給公司,再改用 SQL Server Express（屆時另行處理,現在不用管)
-- 金額一律用 `Money` Value Object(內部對應 `decimal(18,2)`),不要用 `float` / `double`
+- 開發環境:Windows 10
+- 資料庫:PostgreSQL。開發階段在 Windows 10 本機準備 PostgreSQL(可用本機安裝或 repo 內 portable binaries);正式給公司內部使用時,由一台 Mac 作為內部主機,安裝 PostgreSQL 並提供可讓 ASP.NET Core 運行的 HTTPS 服務,員工的 Mac 只用瀏覽器連線,不需要每台 Mac 安裝 PostgreSQL 或 .NET runtime。
+- EF Core PostgreSQL provider 使用 `Npgsql.EntityFrameworkCore.PostgreSQL`;不要使用 SQL Server LocalDB 作為本專案預設資料庫。
+- 金額一律用 `Money` Value Object(C# 內部用 `decimal`,DB 對應 `numeric(18,2)`),不要用 `float` / `double`
 - **不要** 引入雲端服務、Docker、訊息佇列等本階段用不到的東西(另見 §4.8 範圍清單)
 - 要新增 NuGet 套件前,先告知 Amber 並說明用途,得到同意再裝
 
