@@ -14,5 +14,5 @@
 - 對話使用繁體中文。
 - 可以接手上一個 session 的成果，不需要假設前後 session 使用同一個工具。
 - session handoff 目前仍沿用 `.claude/current-handoff.md`，不要因為工具不同就自行搬移或改名。
-- git 指令仍依 `CLAUDE.md` 規定：`git add` / `commit` / `push` 等由 Amber 自己下；AI 只提供建議與 commit message。
+- git 指令仍依 `CLAUDE.md` 規定：AI 可以協助執行 `git add` / `commit` / `push`，但每次執行前必須先列出指令、影響範圍與 commit message，取得 Amber 明確確認後才執行。
 - 每次修改 code 或文件後，用 1 到 3 句白話說明改了什麼、為什麼這樣做。

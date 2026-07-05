@@ -1,6 +1,6 @@
 # CLAUDE.md — ExpenseLite(AI 協作練習・第一階段:Vibe Coding)
 
-> 版本:v1.1(PostgreSQL 決策更新)
+> 版本:v1.2(git 執行規則更新)
 > 適用範圍:本 repo。與「ExpenseSystem 學習專案」、「ASP.NET Core 學習筆記」兩個 repo 互不相干,請勿跨 repo 操作。
 > （`ExpenseLite` 為暫定專案名,Amber 可自行更換。）
 
@@ -124,8 +124,10 @@
 ## 5. 版控規範（git)
 
 - 平常在 `main` 上工作即可;Amber 若想練分支,再開 feature branch
-- **git 指令一律由 Amber 自己下**(`git add` / `commit` / `push` 等),這是她要練的手感,不要代勞
-- 你的角色:**在一個實作段落告一段落時,建議她可以 commit 了,並依照下列格式提供一段現成的 commit message** 給她貼用
+- AI 可以協助執行 `git add` / `git commit` / `git push` 等 git 指令,但**每次執行前必須先給 Amber 看過並取得明確確認**。
+- 執行 git 指令前,AI 需要先列出:預計執行的指令、會 staging / commit / push 的範圍、commit message(若有 commit),以及是否有未納入的變更。
+- Amber 確認後,AI 才能執行對應 git 指令;Amber 也可以選擇自己手動執行。
+- 在一個實作段落告一段落時,AI 仍要主動提醒這裡適合 commit,並依照下列格式提供建議 commit message。
 - Commit message 格式:`<type>: <繁體中文描述>`,type 用 `feat` / `fix` / `refactor` / `docs` / `chore` / `test` / `style`
   - 例:`feat: 新增報銷單建立功能`、`fix: 修正金額加總錯誤`
 - 一次 commit 對應一件事,不要把不相關的改動混在同一個 commit
@@ -140,7 +142,7 @@
 - **Session 開始**:先讀 `.claude/current-handoff.md` 掌握現況(已完成什麼、架構狀態、下一步)。若檔案不存在,視為全新專案,照 §1 開始。
 - **開發過程中**:當一段相關的開發自然告一段落、且處於乾淨狀態(能 build、沒有做一半的破碎改動)時,**主動點出「這裡是個乾淨斷點,若要收工 / 交接,現在是好時機」**。但 **要不要在此斷,由 Amber 決定**——不要自己宣布 session 結束。
 - **Amber 決定交接時**:幫她 **草擬** handoff 內容,交給她 review、視情況調整(讓她從中學會一份好 handoff 長怎樣);把被覆蓋的舊內容歸檔到 `.claude/handoff-archive/handoff-YYYYMMDD-HHmm.md`。
-- handoff 更新好後,提醒 Amber 一起 commit(指令她自己下,見 §5)。
+- handoff 更新好後,依 §5 先列出預計 git 指令與 commit message,取得 Amber 確認後再由 AI 執行,或由 Amber 自己手動執行。
 - 內容聚焦 **系統開發現況**(專案現況 + 架構狀態,含「已落地哪些 pattern / 有無偏離規範」),**不是** Amber 的學習進度。
 
 ---
