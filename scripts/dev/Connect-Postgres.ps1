@@ -7,12 +7,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
-$Psql = Join-Path $PgBin 'psql.exe'
+. (Join-Path $PSScriptRoot 'Resolve-PgEnv.ps1')
+$Pg = Resolve-PgEnv
+
+$Psql = Join-Path $Pg.Bin 'psql.exe'
 
 if (-not (Test-Path -LiteralPath $Psql)) {
-    throw "psql.exe not found under .devtools. Run the environment setup again."
+    throw "psql.exe not found at $Psql."
 }
 
 if (-not $env:PGPASSWORD) {
