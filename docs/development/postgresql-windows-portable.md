@@ -1,6 +1,8 @@
 # PostgreSQL Windows 10 Portable 開發環境筆記
 
-> 本筆記記錄 ExpenseLite 目前 Windows 10 開發機的 PostgreSQL 準備流程。
+> 本筆記記錄 ExpenseLite **桌機** 這台開發機的 PostgreSQL 準備流程（repo 內 portable binaries）。
+> 筆電那台是 `scoop install postgresql`,見 [postgresql-windows-scoop.md](postgresql-windows-scoop.md)。
+> 兩台的資料庫名稱、帳號、port 一致,EF Core migration 與連線字串可共用。
 > 正式公司環境會是一台 Mac 內部主機,不是這份 Windows portable 設定。
 
 ## 目前結果
