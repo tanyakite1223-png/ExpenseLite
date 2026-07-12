@@ -5,9 +5,16 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
-$DataDir = Join-Path $Root '.devdata\postgres'
-$LogDir = Join-Path $Root '.devdata'
+$RepoPgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
+$ScoopPgBin = Join-Path $env:USERPROFILE 'scoop\apps\postgresql\current\bin'
+$PgBin = if (Test-Path -LiteralPath (Join-Path $RepoPgBin 'postgres.exe')) {
+    $RepoPgBin
+}
+else {
+    $ScoopPgBin
+}
+$DataDir = Join-Path $Root '.localdb\postgres\data'
+$LogDir = Join-Path $Root '.localdb\postgres'
 $StdOut = Join-Path $LogDir 'postgres-stdout.log'
 $StdErr = Join-Path $LogDir 'postgres-stderr.log'
 
@@ -36,11 +43,11 @@ function Test-TcpPort {
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $PgBin 'postgres.exe'))) {
-    throw "PostgreSQL binaries not found under .devtools. Run the environment setup again."
+    throw "PostgreSQL binaries not found. Install PostgreSQL with Scoop or place portable binaries under .devtools."
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $DataDir 'PG_VERSION'))) {
-    throw "PostgreSQL data directory not found under .devdata. Run initdb before starting PostgreSQL."
+    throw "PostgreSQL data directory not found under .localdb. Run initdb before starting PostgreSQL."
 }
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null

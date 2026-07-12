@@ -8,11 +8,18 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
+$RepoPgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
+$ScoopPgBin = Join-Path $env:USERPROFILE 'scoop\apps\postgresql\current\bin'
+$PgBin = if (Test-Path -LiteralPath (Join-Path $RepoPgBin 'psql.exe')) {
+    $RepoPgBin
+}
+else {
+    $ScoopPgBin
+}
 $Psql = Join-Path $PgBin 'psql.exe'
 
 if (-not (Test-Path -LiteralPath $Psql)) {
-    throw "psql.exe not found under .devtools. Run the environment setup again."
+    throw "psql.exe not found. Install PostgreSQL with Scoop or place portable binaries under .devtools."
 }
 
 if (-not $env:PGPASSWORD) {

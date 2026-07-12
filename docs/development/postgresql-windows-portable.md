@@ -6,18 +6,27 @@
 ## 目前結果
 
 - PostgreSQL 版本:18.4
-- 來源:EDB PostgreSQL Windows x86-64 binaries
-- binaries 位置:`.devtools/postgresql-18.4/`
-- data directory:`.devdata/postgres/`
+- 目前這台筆電來源:Scoop 安裝的 PostgreSQL
+- 目前這台筆電 binaries 位置:`%USERPROFILE%\scoop\apps\postgresql\current\bin`
+- repo 內 portable binaries 備援位置:`.devtools/postgresql-18.4/`
+- data directory:`.localdb/postgres/data/`
 - host:`127.0.0.1`
 - port:`5432`
 - database:`expenselite_dev`
 - application user:`expenselite_app`
-- `.devtools/` 與 `.devdata/` 已放進 `.gitignore`,不要 commit 本機工具與資料庫資料。
+- `.devtools/`、`.devdata/` 與 `.localdb/` 已放進 `.gitignore`,不要 commit 本機工具與資料庫資料。
 
 明文密碼不要寫進 repo。需要連線時,在本機 shell 設定 `PGPASSWORD` 或之後改用 ASP.NET Core user secrets。
 
-## 為什麼用 portable binaries
+## 目前工具落點說明
+
+這台筆電目前採用 Scoop 的 PostgreSQL binaries,repo 內只保存 `.localdb/postgres/data` 這份本機 cluster。`scripts/dev/*.ps1` 已調整成:
+
+- 若 `.devtools/postgresql-18.4/pgsql/bin` 存在,優先使用 repo 內 portable binaries
+- 否則使用 `%USERPROFILE%\scoop\apps\postgresql\current\bin`
+- data directory 固定使用 `.localdb/postgres/data`
+
+## 為什麼原本考慮 portable binaries
 
 一開始嘗試用 Chocolatey 安裝 PostgreSQL:
 
@@ -27,7 +36,7 @@ choco install postgresql18 --params "'/Password:<本機開發密碼> /Port:5432'
 
 但目前 shell 沒有 Windows 管理員權限,Chocolatey 無法寫入 `C:\ProgramData\chocolatey\lib`,所以沒有使用系統安裝版。
 
-改用 EDB 官方提供的 zip binaries,放在 repo 的 `.devtools/` 裡,不註冊 Windows service,用目前使用者啟動本機開發 DB。
+桌機環境曾改用 EDB 官方提供的 zip binaries,放在 repo 的 `.devtools/` 裡,不註冊 Windows service,用目前使用者啟動本機開發 DB。這台筆電目前則使用 Scoop binaries,避免重新下載一份 repo 內工具。
 
 官方下載頁:
 
@@ -78,8 +87,8 @@ tar -xf .devtools\downloads\postgresql-18.4-1-windows-x64-binaries.zip `
 
 ```powershell
 $Root = (Resolve-Path -LiteralPath '.').Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
-$DataDir = Join-Path $Root '.devdata\postgres'
+$PgBin = Join-Path $env:USERPROFILE 'scoop\apps\postgresql\current\bin'
+$DataDir = Join-Path $Root '.localdb\postgres\data'
 $PwFile = Join-Path $env:TEMP 'expenselite_pg_pw.txt'
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $DataDir) | Out-Null
@@ -90,12 +99,13 @@ Set-Content -LiteralPath $PwFile -Value '<本機開發密碼>' -NoNewline
   -U postgres `
   -A scram-sha-256 `
   --pwfile $PwFile `
+  --locale=C `
   --encoding UTF8
 
 Remove-Item -LiteralPath $PwFile -Force
 ```
 
-初始化完成後,`.devdata/postgres/PG_VERSION` 應該存在。
+初始化完成後,`.localdb/postgres/data/PG_VERSION` 應該存在。
 
 ### 4. 啟動 PostgreSQL
 
@@ -105,14 +115,14 @@ Remove-Item -LiteralPath $PwFile -Force
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Start-Postgres.ps1
 ```
 
-這個腳本會直接啟動 `.devtools/postgresql-18.4/pgsql/bin/postgres.exe`。
+這個腳本會直接啟動 PostgreSQL。它會優先找 `.devtools/postgresql-18.4/pgsql/bin/postgres.exe`,找不到時使用 Scoop 安裝的 PostgreSQL。
 在目前 Codex shell 環境裡,`pg_ctl start` 會遇到 Windows restricted token 問題,所以啟動腳本不用 `pg_ctl start`。
 
 ### 5. 建立 application user 與 database
 
 ```powershell
 $Root = (Resolve-Path -LiteralPath '.').Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
+$PgBin = Join-Path $env:USERPROFILE 'scoop\apps\postgresql\current\bin'
 $env:PGPASSWORD = '<postgres 管理者密碼>'
 
 & (Join-Path $PgBin 'psql.exe') `
@@ -195,7 +205,7 @@ Host=127.0.0.1;Port=5432;Database=expenselite_dev;Username=expenselite_app;Passw
 
 ## 注意事項
 
-- `.devtools/` 與 `.devdata/` 是本機開發用,已被 git ignore。
+- `.devtools/`、`.devdata/` 與 `.localdb/` 是本機開發用,已被 git ignore。
 - 這不是正式部署方式。正式 Mac 內部主機需要另外處理 macOS PostgreSQL 安裝、ASP.NET Core runtime、HTTPS 憑證、自動啟動與備份。
 - 如果 `powershell` 會出現 `oh-my-posh` 找不到的錯誤,用 `-NoProfile` 執行腳本即可避開本機 PowerShell profile 雜訊。
 - 如果 port `5432` 被其他 PostgreSQL 佔用,可以用 `Start-Postgres.ps1 -Port <其他port>` 啟動,但 ASP.NET Core 連線字串也要同步改。
