@@ -2,3 +2,6 @@
 .devtools/
 .devdata/
 
+# .NET build output
+bin/
+obj/

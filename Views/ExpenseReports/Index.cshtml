@@ -1,0 +1,62 @@
+@model IReadOnlyList<ExpenseReportListItemDto>
+
+@{
+    ViewData["Title"] = "報銷單";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h3 mb-1">報銷單</h1>
+        <div class="text-muted">員工墊付款的申請與追蹤</div>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">新增報銷單</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-secondary">目前還沒有報銷單。</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>標題</th>
+                    <th>申請人</th>
+                    <th>狀態</th>
+                    <th class="text-end">總金額</th>
+                    <th>建立時間</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var report in Model)
+            {
+                <tr>
+                    <td>@report.Title</td>
+                    <td>@report.ApplicantName</td>
+                    <td>@StatusText(report.Status)</td>
+                    <td class="text-end">@report.TotalAmount.ToString("N2")</td>
+                    <td>@report.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@report.Id">檢視</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@functions {
+    private static string StatusText(ExpenseReportStatus status) => status switch
+    {
+        ExpenseReportStatus.Draft => "草稿",
+        ExpenseReportStatus.Submitted => "送審中",
+        ExpenseReportStatus.Returned => "退回",
+        ExpenseReportStatus.Approved => "已核准",
+        ExpenseReportStatus.Rejected => "已拒絕",
+        _ => status.ToString()
+    };
+}
