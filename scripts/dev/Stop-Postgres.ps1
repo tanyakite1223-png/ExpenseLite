@@ -4,27 +4,26 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
-$DataDir = Join-Path $Root '.devdata\postgres'
-$PgCtl = Join-Path $PgBin 'pg_ctl.exe'
+. (Join-Path $PSScriptRoot 'Resolve-PgEnv.ps1')
+$Pg = Resolve-PgEnv
+
+$PgCtl = Join-Path $Pg.Bin 'pg_ctl.exe'
 
 if (Test-Path -LiteralPath $PgCtl) {
-    & $PgCtl -D $DataDir -m fast -w stop
+    & $PgCtl -D $Pg.DataDir -m fast -w stop
     if ($LASTEXITCODE -eq 0) {
         exit 0
     }
 }
 
-$postgresRoot = (Resolve-Path -LiteralPath $PgBin).Path
+$binRoot = (Resolve-Path -LiteralPath $Pg.Bin).Path
 $processes = Get-Process -Name postgres -ErrorAction SilentlyContinue |
-    Where-Object { $_.Path -like "$postgresRoot*" }
+    Where-Object { $_.Path -like "$binRoot*" }
 
 if (-not $processes) {
-    Write-Host "No portable PostgreSQL process is running for this repo."
+    Write-Host "No PostgreSQL process ($($Pg.Name)) is running."
     exit 0
 }
 
 $processes | Stop-Process
-Write-Host "Stopped portable PostgreSQL processes for this repo."
-
+Write-Host "Stopped PostgreSQL processes ($($Pg.Name))."

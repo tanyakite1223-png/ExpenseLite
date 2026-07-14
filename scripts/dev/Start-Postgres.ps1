@@ -4,12 +4,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PgBin = Join-Path $Root '.devtools\postgresql-18.4\pgsql\bin'
-$DataDir = Join-Path $Root '.devdata\postgres'
-$LogDir = Join-Path $Root '.devdata'
-$StdOut = Join-Path $LogDir 'postgres-stdout.log'
-$StdErr = Join-Path $LogDir 'postgres-stderr.log'
+. (Join-Path $PSScriptRoot 'Resolve-PgEnv.ps1')
+$Pg = Resolve-PgEnv
+
+$StdOut = Join-Path $Pg.LogDir 'postgres-stdout.log'
+$StdErr = Join-Path $Pg.LogDir 'postgres-stderr.log'
 
 function Test-TcpPort {
     param(
@@ -35,23 +34,19 @@ function Test-TcpPort {
     }
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $PgBin 'postgres.exe'))) {
-    throw "PostgreSQL binaries not found under .devtools. Run the environment setup again."
+if (-not (Test-Path -LiteralPath (Join-Path $Pg.DataDir 'PG_VERSION'))) {
+    throw "PostgreSQL data directory not found at $($Pg.DataDir). Run initdb before starting PostgreSQL."
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $DataDir 'PG_VERSION'))) {
-    throw "PostgreSQL data directory not found under .devdata. Run initdb before starting PostgreSQL."
-}
-
-New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+New-Item -ItemType Directory -Force -Path $Pg.LogDir | Out-Null
 
 if (Test-TcpPort -HostName '127.0.0.1' -PortNumber $Port) {
     Write-Host "PostgreSQL is already accepting connections on 127.0.0.1:$Port."
     exit 0
 }
 
-$postgres = Join-Path $PgBin 'postgres.exe'
-$arguments = @('-D', "`"$DataDir`"", '-p', "$Port")
+$postgres = Join-Path $Pg.Bin 'postgres.exe'
+$arguments = @('-D', "`"$($Pg.DataDir)`"", '-p', "$Port")
 $process = Start-Process -FilePath $postgres `
     -ArgumentList $arguments `
     -WindowStyle Hidden `
@@ -66,10 +61,9 @@ for ($i = 0; $i -lt 30; $i++) {
     }
 
     if (Test-TcpPort -HostName '127.0.0.1' -PortNumber $Port) {
-        Write-Host "PostgreSQL started on 127.0.0.1:$Port. PID: $($process.Id)"
+        Write-Host "PostgreSQL ($($Pg.Name)) started on 127.0.0.1:$Port. PID: $($process.Id)"
         exit 0
     }
 }
 
 Write-Error "PostgreSQL did not start. Check $StdErr for details."
-
