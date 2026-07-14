@@ -1,8 +1,9 @@
 # PostgreSQL Windows（scoop）開發環境筆記
 
-> 這份是「筆電」這台開發機的設定。桌機那台是 repo 內 portable binaries，見
-> [postgresql-windows-portable.md](postgresql-windows-portable.md)。
-> 兩台的資料庫名稱、帳號、port 都一樣，所以 EF Core migration 與連線字串可以共用。
+> 這份是「用 scoop 安裝 PostgreSQL」的 Windows 開發機設定,桌機與筆電目前都採這個方式。
+> repo 內的 portable binaries（`.devtools/`）是更早的做法,見
+> [postgresql-windows-portable.md](postgresql-windows-portable.md),現在當作備援 / 參考。
+> 兩種方式的資料庫名稱、帳號、port 都一樣,EF Core migration 與連線字串可以共用。
 
 ## 目前結果
 
@@ -10,82 +11,90 @@
 - 來源:`scoop install postgresql`
 - binaries 位置:`%USERPROFILE%\scoop\apps\postgresql\current\bin`
 - data directory:`%USERPROFILE%\scoop\apps\postgresql\current\data`
+  - 這是 junction,實際落在 `%USERPROFILE%\scoop\persist\postgresql\data`(在**專案外**,`scoop update` 換版本也不會弄丟)
 - host:`127.0.0.1`
 - port:`5432`
-- database:`expenselite_dev`
+- database:`expenselite_dev`(encoding `UTF8`、locale `C`)
 - application user:`expenselite_app`
-- 認證方式:`scram-sha-256`（與桌機一致）
+- 認證方式:`scram-sha-256`
 
 明文密碼不要寫進 repo。需要連線時,在本機 shell 設定 `PGPASSWORD`,ASP.NET Core 則用 user secrets。
 
 ## 從零準備流程
 
-### 1. 安裝
+### 1. 安裝（會自動初始化 data directory）
 
 ```powershell
 scoop install postgresql
 ```
 
-### 2. 初始化 data directory
+scoop 的 postgresql 安裝腳本**會自動 `initdb`**:資料目錄初始化在 `...\current\data`(junction 到 `...\persist\postgresql\data`)、預設 `trust` 認證、locale `C`、superuser `postgres` 密碼空白。所以**不需要自己再跑 `initdb`**(對已初始化的目錄再跑會失敗)。裝完 `data\PG_VERSION` 應該已存在。
 
-```powershell
-initdb -D "$env:USERPROFILE\scoop\apps\postgresql\current\data" -U postgres
-```
-
-`initdb` 完成後,`data\PG_VERSION` 應該存在。
-
-> scoop 的 `initdb` 預設會產生 `trust` 的 `pg_hba.conf`(本機連線免密碼)。
-> 下面第 4 步會改成 `scram-sha-256`,讓行為跟桌機一致。
-
-### 3. 啟動
-
-```powershell
-pg_ctl start -D "$env:USERPROFILE\scoop\apps\postgresql\current\data"
-```
-
-或用 repo 腳本(會自動判斷這台是 scoop 還是 portable):
+### 2. 啟動
 
 ```powershell
 .\scripts\dev\Start-Postgres.ps1
 ```
 
-### 4. 建立 application user、database,並改為密碼認證
+腳本用 `Resolve-PgEnv.ps1` 自動判斷這台是 scoop 還是 portable。（也可以手動 `pg_ctl start -D "$env:USERPROFILE\scoop\apps\postgresql\current\data"`。)
 
-先用 `psql` 以 `postgres` 連進去(此時還是 trust,不用密碼):
+### 3. 建立 application user 與 database
+
+此時還是 `trust`,用 `postgres` 連進去不用密碼:
 
 ```powershell
 psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
 ```
 
-在 `psql` 內執行(`<本機開發密碼>` 換成自己的):
+在 `psql` 內執行(先不設密碼,下一步再設,避免明文密碼留在指令歷史):
 
 ```sql
-CREATE ROLE expenselite_app LOGIN PASSWORD '<本機開發密碼>';
-ALTER ROLE postgres WITH PASSWORD '<本機開發密碼>';
-CREATE DATABASE expenselite_dev OWNER expenselite_app;
+CREATE ROLE expenselite_app LOGIN;
+
+CREATE DATABASE expenselite_dev
+    OWNER expenselite_app
+    TEMPLATE template0
+    ENCODING 'UTF8'
+    LC_COLLATE 'C'
+    LC_CTYPE 'C';
 
 \connect expenselite_dev
-
 ALTER SCHEMA public OWNER TO expenselite_app;
 GRANT ALL ON SCHEMA public TO expenselite_app;
+```
+
+> 用 `template0` 才能指定跟 cluster 預設不同的 encoding / locale;`UTF8` 讓中文安全,`C` locale 讓排序是穩定的 byte order。
+
+### 4. 設定密碼（隱藏輸入,不留明文）
+
+還在同一個 `psql` 裡,用 `\password`(會提示兩次、隱藏輸入,並自動用 scram 雜湊):
+
+```
+\password expenselite_app
+\password postgres
 \q
 ```
 
-接著把 `data\pg_hba.conf` 裡所有 `trust` 改成 `scram-sha-256`,然後 reload:
+`expenselite_app` 請填跟 ASP.NET Core user secrets 連線字串**同一組**密碼,app 才不用改設定。
+
+### 5. 改成密碼認證（scram）
+
+把 `data\pg_hba.conf` 裡所有 `trust` 改成 `scram-sha-256`,然後 reload:
 
 ```powershell
 pg_ctl reload -D "$env:USERPROFILE\scoop\apps\postgresql\current\data"
 ```
 
-### 5. 驗證
+### 6. 驗證
 
 ```powershell
 $env:PGPASSWORD = '<本機開發密碼>'
 .\scripts\dev\Connect-Postgres.ps1 -Command 'select current_database(), current_user; create table if not exists __permission_check(id integer); drop table __permission_check;'
 ```
 
-看到 `expenselite_dev` / `expenselite_app`,而且 `CREATE TABLE` / `DROP TABLE` 成功,代表 EF Core migration 之後有建表權限。
-另外把 `$env:PGPASSWORD` 清掉後再連一次,應該要被拒絕(`no password supplied`)——代表密碼認證真的生效了。
+看到 `expenselite_dev` / `expenselite_app`、`CREATE TABLE` / `DROP TABLE` 成功,代表有建表權限。
+把 `$env:PGPASSWORD` 清掉後再連一次應該被拒絕(`no password supplied`),代表密碼認證真的生效。
+最完整的驗證是直接跑 `dotnet ef database update`——能套用 migration 就代表整條連線鏈(密碼、權限、UTF8)都通了。
 
 ## 日常使用
 
@@ -105,6 +114,6 @@ Host=127.0.0.1;Port=5432;Database=expenselite_dev;Username=expenselite_app;Passw
 
 ## 注意事項
 
-- scoop 的 PostgreSQL 不註冊成 Windows service,每次開機要自己啟動。
-- data directory 在 scoop 的 app 目錄下,`scoop update postgresql` 到新的 major 版本時要注意資料遷移。
+- scoop 的 PostgreSQL 不註冊成 Windows service,每次開機要自己啟動(用 `Start-Postgres.ps1`)。
+- data directory 是 junction 到 `...\persist\postgresql\data`,`scoop update postgresql` 換版本時資料會保留;但跨 major 版本升級仍建議先備份。
 - 這不是正式部署方式。正式 Mac 內部主機需要另外處理 macOS PostgreSQL 安裝、ASP.NET Core runtime、HTTPS 憑證、自動啟動與備份。

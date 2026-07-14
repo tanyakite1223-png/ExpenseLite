@@ -1,8 +1,8 @@
 # PostgreSQL Windows 10 Portable 開發環境筆記
 
-> 本筆記記錄 ExpenseLite **桌機** 這台開發機的 PostgreSQL 準備流程（repo 內 portable binaries）。
-> 筆電那台是 `scoop install postgresql`,見 [postgresql-windows-scoop.md](postgresql-windows-scoop.md)。
-> 兩台的資料庫名稱、帳號、port 一致,EF Core migration 與連線字串可共用。
+> 這是 ExpenseLite **較早的** Windows 開發環境做法:把 PostgreSQL portable binaries 放在 repo 內（`.devtools/` + `.devdata/`）。
+> 桌機與筆電現在都已改用 `scoop install postgresql`,見 [postgresql-windows-scoop.md](postgresql-windows-scoop.md);這份 portable 筆記留作備援 / 參考。
+> 兩種方式的資料庫名稱、帳號、port 一致,EF Core migration 與連線字串可共用。
 > 正式公司環境會是一台 Mac 內部主機,不是這份 Windows portable 設定。
 
 ## 目前結果
@@ -92,7 +92,8 @@ Set-Content -LiteralPath $PwFile -Value '<本機開發密碼>' -NoNewline
   -U postgres `
   -A scram-sha-256 `
   --pwfile $PwFile `
-  --encoding UTF8
+  --encoding UTF8 `
+  --locale=C
 
 Remove-Item -LiteralPath $PwFile -Force
 ```
