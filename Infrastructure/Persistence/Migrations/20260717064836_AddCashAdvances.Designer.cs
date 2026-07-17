@@ -3,6 +3,7 @@ using System;
 using ExpenseLite.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ExpenseLite.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ExpenseLiteDbContext))]
-    partial class ExpenseLiteDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260717064836_AddCashAdvances")]
+    partial class AddCashAdvances
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -163,18 +166,6 @@ namespace ExpenseLite.Infrastructure.Persistence.Migrations
                             b1.Property<DateOnly>("ExpenseDate")
                                 .HasColumnType("date")
                                 .HasColumnName("expense_date");
-
-                            b1.Property<string>("InvoiceNumber")
-                                .IsRequired()
-                                .HasMaxLength(20)
-                                .HasColumnType("character varying(20)")
-                                .HasColumnName("invoice_number");
-
-                            b1.Property<string>("ReceiptType")
-                                .IsRequired()
-                                .HasMaxLength(20)
-                                .HasColumnType("character varying(20)")
-                                .HasColumnName("receipt_type");
 
                             b1.Property<Guid>("expense_report_id")
                                 .HasColumnType("uuid")

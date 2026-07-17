@@ -1,0 +1,69 @@
+@model IReadOnlyList<CashAdvanceListItemDto>
+
+@{
+    ViewData["Title"] = "預支款";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h3 mb-1">預支款</h1>
+        <div class="text-muted">追蹤預支款與已核准報銷金額的核對狀態</div>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">新增預支款</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-secondary">目前還沒有預支款。</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>預支日期</th>
+                    <th>領款人</th>
+                    <th>用途</th>
+                    <th class="text-end">預支金額</th>
+                    <th class="text-end">已核准報銷</th>
+                    <th class="text-end">差額</th>
+                    <th>核對狀態</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var cashAdvance in Model)
+            {
+                <tr>
+                    <td>@cashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</td>
+                    <td>@cashAdvance.PayeeName</td>
+                    <td>@cashAdvance.Purpose</td>
+                    <td class="text-end">@cashAdvance.Amount.ToString("N2")</td>
+                    <td class="text-end">@cashAdvance.ApprovedReimbursedAmount.ToString("N2")</td>
+                    <td class="text-end">@cashAdvance.Difference.ToString("N2")</td>
+                    <td>@ReconciliationText(cashAdvance)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@functions {
+    private static string ReconciliationText(CashAdvanceListItemDto cashAdvance)
+    {
+        if (cashAdvance.IsSettled)
+        {
+            return "已對上";
+        }
+
+        if (cashAdvance.ApprovedReimbursedAmount == 0m)
+        {
+            return "未結清";
+        }
+
+        return cashAdvance.Difference > 0m
+            ? "公司需補付"
+            : "員工需繳回";
+    }
+}

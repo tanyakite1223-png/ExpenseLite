@@ -1,3 +1,4 @@
+using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Domain.ValueObjects;
@@ -7,10 +8,14 @@ namespace ExpenseLite.Application.ExpenseReports;
 public sealed class ExpenseReportAppService
 {
     private readonly IExpenseReportRepository _reports;
+    private readonly ICashAdvanceRepository _cashAdvances;
 
-    public ExpenseReportAppService(IExpenseReportRepository reports)
+    public ExpenseReportAppService(
+        IExpenseReportRepository reports,
+        ICashAdvanceRepository cashAdvances)
     {
         _reports = reports;
+        _cashAdvances = cashAdvances;
     }
 
     public async Task<IReadOnlyList<ExpenseReportListItemDto>> ListAsync(CancellationToken cancellationToken = default)
@@ -31,7 +36,25 @@ public sealed class ExpenseReportAppService
 
     public async Task<Guid> CreateAsync(CreateExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
-        var report = ExpenseReport.Create(command.Title, command.ApplicantName);
+        if (command.PaymentMethod == ExpensePaymentMethod.CashAdvance)
+        {
+            if (command.CashAdvanceId is null)
+            {
+                throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
+            }
+
+            var cashAdvance = await _cashAdvances.GetByIdAsync(command.CashAdvanceId.Value, cancellationToken);
+            if (cashAdvance is null)
+            {
+                throw new DomainRuleViolationException("找不到指定的預支款。");
+            }
+        }
+
+        var report = ExpenseReport.Create(
+            command.Title,
+            command.ApplicantName,
+            command.PaymentMethod,
+            command.CashAdvanceId);
 
         await _reports.AddAsync(report, cancellationToken);
         await _reports.SaveChangesAsync(cancellationToken);
@@ -47,6 +70,8 @@ public sealed class ExpenseReportAppService
             command.ExpenseDate,
             command.Category,
             command.Description,
+            command.ReceiptType,
+            command.InvoiceNumber,
             Money.From(command.Amount));
 
         await _reports.SaveChangesAsync(cancellationToken);
@@ -70,6 +95,33 @@ public sealed class ExpenseReportAppService
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task ReturnAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(id, cancellationToken);
+
+        report.Return();
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ApproveAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(id, cancellationToken);
+
+        report.Approve();
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RejectAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(id, cancellationToken);
+
+        report.Reject();
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task<ExpenseReport> GetRequiredReportAsync(Guid id, CancellationToken cancellationToken)
     {
         var report = await _reports.GetByIdAsync(id, cancellationToken);
@@ -83,6 +135,8 @@ public sealed class ExpenseReportAppService
             report.Title,
             report.ApplicantName,
             report.Status,
+            report.PaymentMethod,
+            report.CashAdvanceId,
             report.TotalAmount.Amount,
             report.CreatedAt);
 
@@ -92,6 +146,8 @@ public sealed class ExpenseReportAppService
             report.Title,
             report.ApplicantName,
             report.Status,
+            report.PaymentMethod,
+            report.CashAdvanceId,
             report.TotalAmount.Amount,
             report.CreatedAt,
             report.SubmittedAt,
@@ -102,6 +158,8 @@ public sealed class ExpenseReportAppService
                     x.ExpenseDate,
                     x.Category,
                     x.Description,
+                    x.ReceiptType,
+                    x.InvoiceNumber,
                     x.Amount.Amount))
                 .ToList());
 }

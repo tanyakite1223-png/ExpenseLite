@@ -1,3 +1,4 @@
+using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Infrastructure;
 
@@ -9,6 +10,7 @@ builder.Logging.AddDebug();
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<ExpenseReportAppService>();
+builder.Services.AddScoped<CashAdvanceAppService>();
 builder.Services.AddExpenseLiteInfrastructure(builder.Configuration);
 
 var app = builder.Build();

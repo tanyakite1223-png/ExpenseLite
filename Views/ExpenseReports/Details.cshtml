@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = Model.Report.Title;
     var canEdit = Model.Report.Status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
+    var canReview = Model.Report.Status is ExpenseReportStatus.Submitted;
 }
 
 <div class="mb-3">
@@ -23,6 +24,7 @@
     <div>
         <h1 class="h3 mb-1">@Model.Report.Title</h1>
         <div class="text-muted">申請人：@Model.Report.ApplicantName</div>
+        <div class="text-muted">付款方式：@PaymentMethodText(Model.Report.PaymentMethod)</div>
     </div>
     <div class="text-end">
         <div class="badge bg-secondary mb-2">@StatusText(Model.Report.Status)</div>
@@ -40,6 +42,20 @@
                     <button type="submit" class="btn btn-success btn-sm">送審</button>
                 </form>
             }
+            @if (canReview)
+            {
+                <div class="d-flex gap-2">
+                    <form asp-action="Approve" asp-route-id="@Model.Report.Id" method="post">
+                        <button type="submit" class="btn btn-success btn-sm">核准</button>
+                    </form>
+                    <form asp-action="Return" asp-route-id="@Model.Report.Id" method="post">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">退回</button>
+                    </form>
+                    <form asp-action="Reject" asp-route-id="@Model.Report.Id" method="post">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">拒絕</button>
+                    </form>
+                </div>
+            }
         </div>
 
         @if (Model.Report.Details.Count == 0)
@@ -55,6 +71,8 @@
                             <th>日期</th>
                             <th>類別</th>
                             <th>說明</th>
+                            <th>單據</th>
+                            <th>發票號碼</th>
                             <th class="text-end">金額</th>
                             @if (canEdit)
                             {
@@ -69,6 +87,8 @@
                             <td>@detail.ExpenseDate.ToString("yyyy/MM/dd")</td>
                             <td>@detail.Category</td>
                             <td>@detail.Description</td>
+                            <td>@ReceiptTypeText(detail.ReceiptType)</td>
+                            <td>@DisplayInvoiceNumber(detail)</td>
                             <td class="text-end">@detail.Amount.ToString("N2")</td>
                             @if (canEdit)
                             {
@@ -112,6 +132,22 @@
                 </div>
 
                 <div class="mb-3">
+                    <label asp-for="NewDetail.ReceiptType" class="form-label">單據類型</label>
+                    <select asp-for="NewDetail.ReceiptType" class="form-select">
+                        <option value="@ExpenseReceiptType.Receipt">收據</option>
+                        <option value="@ExpenseReceiptType.Invoice">發票</option>
+                    </select>
+                    <span asp-validation-for="NewDetail.ReceiptType" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="NewDetail.InvoiceNumber" class="form-label">發票號碼</label>
+                    <input asp-for="NewDetail.InvoiceNumber" class="form-control" autocomplete="off" />
+                    <div class="form-text">單據類型為發票時必填。</div>
+                    <span asp-validation-for="NewDetail.InvoiceNumber" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
                     <label asp-for="NewDetail.Amount" class="form-label">金額</label>
                     <input asp-for="NewDetail.Amount" class="form-control" inputmode="decimal" />
                     <span asp-validation-for="NewDetail.Amount" class="text-danger"></span>
@@ -141,4 +177,21 @@
         ExpenseReportStatus.Rejected => "已拒絕",
         _ => status.ToString()
     };
+
+    private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
+    {
+        ExpensePaymentMethod.EmployeePaid => "員工墊款",
+        ExpensePaymentMethod.CashAdvance => "預支費用",
+        _ => paymentMethod.ToString()
+    };
+
+    private static string ReceiptTypeText(ExpenseReceiptType receiptType) => receiptType switch
+    {
+        ExpenseReceiptType.Receipt => "收據",
+        ExpenseReceiptType.Invoice => "發票",
+        _ => receiptType.ToString()
+    };
+
+    private static string DisplayInvoiceNumber(ExpenseDetailDto detail)
+        => detail.ReceiptType == ExpenseReceiptType.Invoice ? detail.InvoiceNumber : "-";
 }

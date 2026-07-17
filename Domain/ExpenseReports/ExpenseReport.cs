@@ -11,10 +11,15 @@ public sealed class ExpenseReport
     {
         Title = string.Empty;
         ApplicantName = string.Empty;
+        PaymentMethod = ExpensePaymentMethod.EmployeePaid;
         TotalAmount = Money.Zero;
     }
 
-    private ExpenseReport(string title, string applicantName)
+    private ExpenseReport(
+        string title,
+        string applicantName,
+        ExpensePaymentMethod paymentMethod,
+        Guid? cashAdvanceId)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -26,9 +31,21 @@ public sealed class ExpenseReport
             throw new DomainRuleViolationException("申請人不可空白。");
         }
 
+        if (paymentMethod == ExpensePaymentMethod.CashAdvance && cashAdvanceId is null)
+        {
+            throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
+        }
+
+        if (paymentMethod == ExpensePaymentMethod.EmployeePaid && cashAdvanceId is not null)
+        {
+            throw new DomainRuleViolationException("員工墊款報銷單不可連到預支款。");
+        }
+
         Id = Guid.NewGuid();
         Title = title.Trim();
         ApplicantName = applicantName.Trim();
+        PaymentMethod = paymentMethod;
+        CashAdvanceId = cashAdvanceId;
         Status = ExpenseReportStatus.Draft;
         TotalAmount = Money.Zero;
         CreatedAt = DateTimeOffset.UtcNow;
@@ -42,6 +59,10 @@ public sealed class ExpenseReport
 
     public ExpenseReportStatus Status { get; private set; }
 
+    public ExpensePaymentMethod PaymentMethod { get; private set; }
+
+    public Guid? CashAdvanceId { get; private set; }
+
     public Money TotalAmount { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -50,14 +71,30 @@ public sealed class ExpenseReport
 
     public IReadOnlyCollection<ExpenseDetail> Details => _details.AsReadOnly();
 
-    public static ExpenseReport Create(string title, string applicantName)
-        => new(title, applicantName);
+    public static ExpenseReport Create(
+        string title,
+        string applicantName,
+        ExpensePaymentMethod paymentMethod,
+        Guid? cashAdvanceId)
+        => new(title, applicantName, paymentMethod, cashAdvanceId);
 
-    public ExpenseDetail AddDetail(DateOnly expenseDate, string category, string description, Money amount)
+    public ExpenseDetail AddDetail(
+        DateOnly expenseDate,
+        string category,
+        string description,
+        ExpenseReceiptType receiptType,
+        string? invoiceNumber,
+        Money amount)
     {
         EnsureEditable();
 
-        var detail = new ExpenseDetail(expenseDate, category, description, amount);
+        var detail = new ExpenseDetail(
+            expenseDate,
+            category,
+            description,
+            receiptType,
+            invoiceNumber,
+            amount);
         _details.Add(detail);
         RecalculateTotal();
 

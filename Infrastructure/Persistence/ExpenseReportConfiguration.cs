@@ -32,6 +32,15 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(x => x.PaymentMethod)
+            .HasColumnName("payment_method")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(x => x.CashAdvanceId)
+            .HasColumnName("cash_advance_id");
+
         builder.Property(x => x.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -76,6 +85,17 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
             detail.Property(x => x.Description)
                 .HasColumnName("description")
                 .HasMaxLength(200)
+                .IsRequired();
+
+            detail.Property(x => x.ReceiptType)
+                .HasColumnName("receipt_type")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            detail.Property(x => x.InvoiceNumber)
+                .HasColumnName("invoice_number")
+                .HasMaxLength(20)
                 .IsRequired();
 
             detail.OwnsOne(x => x.Amount, money =>

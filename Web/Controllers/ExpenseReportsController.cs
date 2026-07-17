@@ -1,3 +1,4 @@
+using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.ExpenseReports;
@@ -8,10 +9,14 @@ namespace ExpenseLite.Web.Controllers;
 public sealed class ExpenseReportsController : Controller
 {
     private readonly ExpenseReportAppService _expenseReports;
+    private readonly CashAdvanceAppService _cashAdvances;
 
-    public ExpenseReportsController(ExpenseReportAppService expenseReports)
+    public ExpenseReportsController(
+        ExpenseReportAppService expenseReports,
+        CashAdvanceAppService cashAdvances)
     {
         _expenseReports = expenseReports;
+        _cashAdvances = cashAdvances;
     }
 
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
@@ -20,9 +25,9 @@ public sealed class ExpenseReportsController : Controller
         return View(reports);
     }
 
-    public IActionResult Create()
+    public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
-        return View(new CreateExpenseReportForm());
+        return View(await BuildCreateFormAsync(new CreateExpenseReportForm(), cancellationToken));
     }
 
     [HttpPost]
@@ -31,13 +36,17 @@ public sealed class ExpenseReportsController : Controller
     {
         if (!ModelState.IsValid)
         {
-            return View(form);
+            return View(await BuildCreateFormAsync(form, cancellationToken));
         }
 
         try
         {
             var id = await _expenseReports.CreateAsync(
-                new CreateExpenseReportCommand(form.Title, form.ApplicantName),
+                new CreateExpenseReportCommand(
+                    form.Title,
+                    form.ApplicantName,
+                    form.PaymentMethod,
+                    form.CashAdvanceId),
                 cancellationToken);
 
             return RedirectToAction(nameof(Details), new { id });
@@ -45,7 +54,7 @@ public sealed class ExpenseReportsController : Controller
         catch (DomainRuleViolationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return View(form);
+            return View(await BuildCreateFormAsync(form, cancellationToken));
         }
     }
 
@@ -87,6 +96,8 @@ public sealed class ExpenseReportsController : Controller
                     newDetail.ExpenseDate,
                     newDetail.Category,
                     newDetail.Description,
+                    newDetail.ReceiptType,
+                    newDetail.InvoiceNumber,
                     newDetail.Amount),
                 cancellationToken);
 
@@ -130,5 +141,64 @@ public sealed class ExpenseReportsController : Controller
         }
 
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Return(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _expenseReports.ReturnAsync(id, cancellationToken);
+            TempData["SuccessMessage"] = "報銷單已退回。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Approve(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _expenseReports.ApproveAsync(id, cancellationToken);
+            TempData["SuccessMessage"] = "報銷單已核准。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reject(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _expenseReports.RejectAsync(id, cancellationToken);
+            TempData["SuccessMessage"] = "報銷單已拒絕。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    private async Task<CreateExpenseReportForm> BuildCreateFormAsync(
+        CreateExpenseReportForm form,
+        CancellationToken cancellationToken)
+    {
+        form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
+        return form;
     }
 }

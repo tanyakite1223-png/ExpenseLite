@@ -7,7 +7,7 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
         <h1 class="h3 mb-1">報銷單</h1>
-        <div class="text-muted">員工墊付款的申請與追蹤</div>
+        <div class="text-muted">員工墊款與預支費用的申請與追蹤</div>
     </div>
     <a class="btn btn-primary" asp-action="Create">新增報銷單</a>
 </div>
@@ -24,6 +24,7 @@ else
                 <tr>
                     <th>標題</th>
                     <th>申請人</th>
+                    <th>付款方式</th>
                     <th>狀態</th>
                     <th class="text-end">總金額</th>
                     <th>建立時間</th>
@@ -36,6 +37,7 @@ else
                 <tr>
                     <td>@report.Title</td>
                     <td>@report.ApplicantName</td>
+                    <td>@PaymentMethodText(report.PaymentMethod)</td>
                     <td>@StatusText(report.Status)</td>
                     <td class="text-end">@report.TotalAmount.ToString("N2")</td>
                     <td>@report.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
@@ -58,5 +60,12 @@ else
         ExpenseReportStatus.Approved => "已核准",
         ExpenseReportStatus.Rejected => "已拒絕",
         _ => status.ToString()
+    };
+
+    private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
+    {
+        ExpensePaymentMethod.EmployeePaid => "員工墊款",
+        ExpensePaymentMethod.CashAdvance => "預支費用",
+        _ => paymentMethod.ToString()
     };
 }

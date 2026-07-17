@@ -7,6 +7,8 @@ public sealed record ExpenseReportListItemDto(
     string Title,
     string ApplicantName,
     ExpenseReportStatus Status,
+    ExpensePaymentMethod PaymentMethod,
+    Guid? CashAdvanceId,
     decimal TotalAmount,
     DateTimeOffset CreatedAt);
 
@@ -15,6 +17,8 @@ public sealed record ExpenseReportDetailDto(
     string Title,
     string ApplicantName,
     ExpenseReportStatus Status,
+    ExpensePaymentMethod PaymentMethod,
+    Guid? CashAdvanceId,
     decimal TotalAmount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SubmittedAt,
@@ -25,4 +29,6 @@ public sealed record ExpenseDetailDto(
     DateOnly ExpenseDate,
     string Category,
     string Description,
+    ExpenseReceiptType ReceiptType,
+    string InvoiceNumber,
     decimal Amount);

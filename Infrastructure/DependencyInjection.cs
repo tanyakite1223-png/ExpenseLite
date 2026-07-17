@@ -1,4 +1,6 @@
+using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Infrastructure.CashAdvances;
 using ExpenseLite.Infrastructure.ExpenseReports;
 using ExpenseLite.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +27,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IExpenseReportRepository, EfExpenseReportRepository>();
+        services.AddScoped<ICashAdvanceRepository, EfCashAdvanceRepository>();
 
         return services;
     }

@@ -25,6 +25,33 @@
         <span asp-validation-for="ApplicantName" class="text-danger"></span>
     </div>
 
+    <div class="mb-3">
+        <label asp-for="PaymentMethod" class="form-label">付款方式</label>
+        <select asp-for="PaymentMethod" class="form-select">
+            <option value="@ExpensePaymentMethod.EmployeePaid">員工墊款</option>
+            <option value="@ExpensePaymentMethod.CashAdvance">預支費用</option>
+        </select>
+        <span asp-validation-for="PaymentMethod" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="CashAdvanceId" class="form-label">對應預支款</label>
+        <select asp-for="CashAdvanceId" class="form-select">
+            <option value="">不使用預支款</option>
+            @foreach (var cashAdvance in Model.CashAdvanceOptions)
+            {
+                <option value="@cashAdvance.Id">
+                    @cashAdvance.AdvancedAt.ToString("yyyy/MM/dd") -
+                    @cashAdvance.PayeeName -
+                    @cashAdvance.Purpose -
+                    @cashAdvance.Amount.ToString("N2")
+                </option>
+            }
+        </select>
+        <div class="form-text">只有付款方式為預支費用時需要選擇。</div>
+        <span asp-validation-for="CashAdvanceId" class="text-danger"></span>
+    </div>
+
     <button type="submit" class="btn btn-primary">建立</button>
     <a class="btn btn-outline-secondary" asp-action="Index">取消</a>
 </form>
