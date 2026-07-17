@@ -1,6 +1,7 @@
 # Local PostgreSQL development tools and data
 .devtools/
 .devdata/
+.localdb/
 
 # .NET build output
 bin/
