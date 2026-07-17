@@ -3,21 +3,32 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔,結束時更新此檔(舊內容歸檔到 `.claude/handoff-archive/`)。
 > 內容聚焦「專案現況 + 架構狀態」,不是學習進度。
 
-> 最後更新:2026-07-15 — 桌機開發環境從 portable 切換成 scoop
+> 最後更新:2026-07-17 — 預支款核對與明細單據欄位
 
 ---
 
-## 上次 session 摘要
+## 本次 session 摘要
 
-- 把桌機的 PostgreSQL 開發環境從「repo 內 portable binaries」改成「scoop 安裝」,主要動機是不想把 DB 資料放在專案目錄內。
-- 合併了筆電先前推的 `chore/dev-env-scoop` 分支(merge commit),帶進 `scripts/dev/Resolve-PgEnv.ps1`(自動判斷 scoop / portable)與 scoop 環境筆記。
-- 桌機實際切換內容:
-  - `scoop install postgresql`(18.4-2);安裝腳本會自動 `initdb`,data 目錄是 junction → `~\scoop\persist\postgresql\data`(專案外)。
-  - 停掉舊的 portable postgres,把 `.devtools/` → `.devtools.bak/`、`.devdata/` → `.devdata.bak/`(改名保留,未刪除)。
-  - 建立 `expenselite_dev`(UTF8 / C locale)與 `expenselite_app` role,密碼用 `\password` 設定(未經過 AI)。
-  - `pg_hba.conf` 全部改成 `scram-sha-256` 並 reload;無密碼連線已驗證會被拒。
-  - `dotnet ef database update` 成功套用兩個 migration → 整條連線鏈(密碼、權限、UTF8)驗證通過。
-- 另一台筆電的 `chore/laptop-postgres-env` 分支**未合併**(方向是把 DB 放在專案內的 `.localdb`,與這次決定相反);其中有用的兩點已手動 fold 進 main:`Stop-Postgres.ps1` 改用 `postmaster.pid` 停程序、portable `initdb` 補 `--locale=C`。
+- 先驗證本機狀態:
+  - `dotnet build` 成功。
+  - PostgreSQL 一開始未啟動,執行 `scripts/dev/Start-Postgres.ps1` 後,`dotnet ef database update` 可連線成功。
+- 新增「預支款核對」最小功能:
+  - 新增 `CashAdvance` aggregate root,記錄領款人、用途、預支日期、預支金額。
+  - 報銷單新增付款方式:`EmployeePaid`(員工墊款)、`CashAdvance`(預支費用)。
+  - 預支費用報銷單必須連到一筆預支款。
+  - 預支款列表顯示預支金額、已核准報銷金額、差額與核對狀態。
+  - 範圍刻意只做到「可追蹤、可和報銷單核銷金額核對、月底可查未結清」,沒有做完整會計總帳或現金補繳/補付紀錄。
+- 新增「明細單據欄位」:
+  - 明細新增單據類型:`Receipt`(收據)、`Invoice`(發票)。
+  - 單據類型選發票時,發票號碼必填。
+  - 明細列表與新增明細表單已顯示單據類型 / 發票號碼。
+- 新增 EF Core migrations:
+  - `20260717064836_AddCashAdvances`
+  - `20260717072257_AddExpenseDetailReceiptFields`
+  - 兩個 migration 已用 `dotnet ef database update` 套到本機 PostgreSQL。
+- 新增架構文件:
+  - `docs/architecture/cash-advance-reconciliation.md`
+- `.gitignore` 新增 `.localdb/`,避免本機 DB 資料夾進 Git。
 
 ## 專案現況
 
@@ -28,25 +39,23 @@
   - 新增 / 移除明細
   - 明細金額加總到報銷單總額
   - 草稿報銷單送審
+  - 核准 / 退回 / 拒絕流程 UI
+  - 預支款建立與核對列表
+  - 報銷單付款方式:員工墊款 / 預支費用
+  - 明細單據類型:收據 / 發票,且發票號碼必填
 - 進行中 / 未完成:
-  - 核准 / 退回 / 拒絕流程尚未做 UI
-  - 尚未有使用者 / 角色 / 權限
-  - 尚未有附件或發票照片上傳
-  - UI 仍是基礎 Bootstrap 版
-- build & 跑得起來嗎:
+  - 一般支出 / 專案支出的分類尚未做。
+  - `Project` 專案資料與結案封存尚未做。
+  - 尚未有使用者 / 角色 / 權限,目前仍手動輸入申請人。
+  - 尚未有附件或發票照片上傳。
+  - 審核流程尚未記錄審核人、審核時間、退回/拒絕原因。
+  - 預支款尚未記錄員工實際繳回或公司實際補付,目前只做金額核對。
+  - 列表篩選尚未做。
+  - UI 仍是基礎 Bootstrap 版。
+- build & DB:
   - `dotnet build` 成功。
-  - 本機 scoop PostgreSQL 已可用,`dotnet ef database update` 已跑過。
+  - `dotnet ef database update` 成功,已套用最新 migration。
   - 本機連線字串透過 user secrets 設定,不寫入 repo。
-- 開發 DB(桌機,scoop):
-  - 來源:`scoop install postgresql`(18.4-2)。
-  - binaries:`~\scoop\apps\postgresql\current\bin`。
-  - data directory:`~\scoop\apps\postgresql\current\data`(junction → `~\scoop\persist\postgresql\data`,專案外)。
-  - database:`expenselite_dev`(UTF8 / C);application user:`expenselite_app`;認證 `scram-sha-256`。
-  - 舊的 portable 環境已改名為 `.devtools.bak/`、`.devdata.bak/`(未刪除,確認 scoop 穩定後可自行清掉)。
-- 開發環境筆記:
-  - `docs/development/postgresql-windows-scoop.md`(目前主用)
-  - `docs/development/postgresql-windows-portable.md`(較早做法,留作備援)
-  - `docs/development/aspnet-core-local-run.md`
 
 ## 架構狀態
 
@@ -57,38 +66,53 @@
   - Rich Domain Model
   - `ExpenseReport` Aggregate Root
   - `ExpenseDetail` 作為 aggregate 內部 entity
+  - `CashAdvance` Aggregate Root
   - `Money` Value Object
   - `IExpenseReportRepository`
+  - `ICashAdvanceRepository`
   - EF Core owned type mapping
 - `/docs/architecture/` 已有的篇章:
   - `layered-architecture.md`
   - `expense-report-aggregate.md`
   - `money-value-object.md`
   - `repository-and-ef-core.md`
+  - `cash-advance-reconciliation.md`
 - 有無偏離 CLAUDE.md 規範(技術債):
-  - 無明顯偏離(本次只動開發環境,未動應用程式架構)。
-  - EF Core tool 版本 `10.0.7` 比 runtime `10.0.9` 舊,只有提示,未阻擋 migration / build。
+  - 無明顯偏離。
+  - `CashAdvance` 是獨立 aggregate root;報銷單只用 `CashAdvanceId` 參照,符合跨 aggregate 用 ID 的規範。
+  - 預支款核對目前由 Application Service 查詢報銷單與預支款後組成 DTO,沒有把跨 aggregate 查詢邏輯塞進 Domain entity。
+
+## 開發環境狀態
+
+- 開發 DB(桌機,scoop):
+  - 來源:`scoop install postgresql`。
+  - binaries:`~\scoop\apps\postgresql\current\bin`。
+  - data directory:`~\scoop\apps\postgresql\current\data`(junction → `~\scoop\persist\postgresql\data`,專案外)。
+  - database:`expenselite_dev`;application user:`expenselite_app`。
+- repo 內本機資料:
+  - `.localdb/` 仍可能存在於本機,但 `.gitignore` 已忽略,不會進 Git。
+  - 舊的 `.devtools.bak/`、`.devdata.bak/` 若確認 scoop 穩定,之後可由 Amber 決定是否刪除。
 
 ## 待 Amber 決定 / 待辦
 
-- 應用功能:下一個方向建議從審核流程開始(核准 / 退回 / 拒絕),也可先做列表篩選、刪除草稿、編輯基本資料或 UI 改善。
-- 開發環境(跨機器):
-  - 另一台筆電(目前 checkout 在 `chore/laptop-postgres-env`)要對齊:先 `git checkout main && git pull` 拿到 scoop 支援,再重做一次 scoop 目錄的 initdb / 建 role / 建 UTF8 db(等同這次桌機 Phase 2 的縮小版);舊的 `.localdb/` 在 main 上不再被 ignore,驗證後可刪。
-  - 兩台都切到 scoop 之後,再清掉遠端分支 `chore/dev-env-scoop`(已合併)與 `chore/laptop-postgres-env`(已榨乾價值)。刪遠端分支屬不可逆操作,先確認再動。
-  - 桌機確認 scoop 穩定後,可刪 `.devtools.bak/`、`.devdata.bak/`。
-
-## 下一步建議
-
-- 應用面優先做「審核流程 UI」:
-  - 在詳細頁依狀態顯示核准 / 退回 / 拒絕按鈕
-  - Application Service 呼叫 `report.Approve()` / `report.Return()` / `report.Reject()`
-  - 補必要的頁面訊息與錯誤處理
+- 應用面下一步建議:
+  - 優先做「一般支出 / 專案支出」與 `Project` 專案資料。
+  - 接著做專案結案後,相關報銷單封存供查詢。
+- 可補強:
+  - 審核人、審核時間、退回/拒絕原因。
+  - 預支款實際結清紀錄(員工已繳回 / 公司已補付),但目前不是必要範圍。
+  - 附件或發票照片上傳。
+  - 報銷單 / 預支款列表篩選。
+- 開發環境:
+  - 另一台筆電若尚未對齊 scoop PostgreSQL,仍需拉 main 後重建 scoop 方向的本機 DB。
+  - 兩台都穩定後,再考慮清掉遠端舊分支 `origin/chore/dev-env-scoop`、`origin/chore/laptop-postgres-env`。刪遠端分支屬不可逆操作,先確認再動。
 
 ## git 狀態
 
-- 本 session 的 commit(待 push):
-  - `merge: 併入 scoop / portable 雙支援的開發環境腳本`
-  - `refactor: Stop-Postgres 改用 postmaster.pid 精準停 postgres`
-  - `docs: scoop / portable 開發環境筆記對齊實際流程`
-  - `docs: 更新 handoff — 桌機切換 scoop 開發環境`
-- 遠端分支:`origin/chore/dev-env-scoop`(已合併)、`origin/chore/laptop-postgres-env`(未合併,待處理)。
+- 本 session 已完成 commit:
+  - `1ed45b7 feat: 新增預支款核對與明細單據欄位`
+  - `e2dbceb chore: 忽略本機 localdb 資料夾`
+- 更新本 handoff 後,建議再 commit:
+  - `docs: 更新 handoff — 預支款與單據欄位`
+- 目前 `main` 比 `origin/main` ahead 2(在 handoff commit 前);完成 handoff commit 後會 ahead 3。
+- 尚未 push。push 前需依 CLAUDE.md 規定列出指令、範圍並取得 Amber 確認。
