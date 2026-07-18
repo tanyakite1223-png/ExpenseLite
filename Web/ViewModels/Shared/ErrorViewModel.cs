@@ -1,4 +1,4 @@
-namespace ExpenseLite.Models;
+namespace ExpenseLite.Web.ViewModels.Shared;
 
 public class ErrorViewModel
 {

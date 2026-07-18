@@ -1,8 +1,8 @@
 using System.Diagnostics;
+using ExpenseLite.Web.ViewModels.Shared;
 using Microsoft.AspNetCore.Mvc;
-using ExpenseLite.Models;
 
-namespace ExpenseLite.Controllers;
+namespace ExpenseLite.Web.Controllers;
 
 public class HomeController : Controller
 {

@@ -9,7 +9,13 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddRazorOptions(options =>
+    {
+        options.ViewLocationFormats.Clear();
+        options.ViewLocationFormats.Add("/Web/Views/{1}/{0}.cshtml");
+        options.ViewLocationFormats.Add("/Web/Views/Shared/{0}.cshtml");
+    });
 builder.Services.AddScoped<ExpenseReportAppService>();
 builder.Services.AddScoped<CashAdvanceAppService>();
 builder.Services.AddScoped<ProjectAppService>();
