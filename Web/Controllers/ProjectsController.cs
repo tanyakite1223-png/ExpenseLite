@@ -50,4 +50,21 @@ public sealed class ProjectsController : Controller
             return View(form);
         }
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Close(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _projects.CloseAsync(id, cancellationToken);
+            TempData["SuccessMessage"] = "專案已結案。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
 }

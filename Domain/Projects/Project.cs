@@ -42,4 +42,14 @@ public sealed class Project
 
     public static Project Create(string name, string customerName)
         => new(name, customerName);
+
+    public void Close()
+    {
+        if (Status != ProjectStatus.Active)
+        {
+            throw new DomainRuleViolationException("只有進行中的專案可以結案。");
+        }
+
+        Status = ProjectStatus.Closed;
+    }
 }

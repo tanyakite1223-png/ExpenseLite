@@ -1,4 +1,5 @@
 using ExpenseLite.Domain.ExpenseReports;
+using ExpenseLite.Domain.Projects;
 
 namespace ExpenseLite.Application.ExpenseReports;
 
@@ -23,6 +24,7 @@ public sealed record ExpenseReportDetailDto(
     ExpenseType ExpenseType,
     Guid? ProjectId,
     string? ProjectName,
+    ProjectStatus? ProjectStatus,
     ExpensePaymentMethod PaymentMethod,
     Guid? CashAdvanceId,
     decimal TotalAmount,

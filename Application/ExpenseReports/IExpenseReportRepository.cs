@@ -8,6 +8,10 @@ public interface IExpenseReportRepository
 
     Task<ExpenseReport?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<Dictionary<Guid, int>> CountUnfinishedProjectReportsAsync(CancellationToken cancellationToken = default);
+
+    Task<bool> HasUnfinishedProjectReportsAsync(Guid projectId, CancellationToken cancellationToken = default);
+
     Task AddAsync(ExpenseReport report, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

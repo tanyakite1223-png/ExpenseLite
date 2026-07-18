@@ -7,6 +7,7 @@ public sealed record ProjectListItemDto(
     string Name,
     string CustomerName,
     ProjectStatus Status,
+    int UnfinishedExpenseReportCount,
     DateTimeOffset CreatedAt);
 
 public sealed record ProjectOptionDto(

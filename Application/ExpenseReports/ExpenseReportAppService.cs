@@ -42,8 +42,8 @@ public sealed class ExpenseReportAppService
             return null;
         }
 
-        var projectName = await GetProjectNameAsync(report.ProjectId, cancellationToken);
-        return MapDetails(report, projectName);
+        var project = await GetProjectAsync(report.ProjectId, cancellationToken);
+        return MapDetails(report, project?.Name, project?.Status);
     }
 
     public async Task<Guid> CreateAsync(CreateExpenseReportCommand command, CancellationToken cancellationToken = default)
@@ -123,6 +123,8 @@ public sealed class ExpenseReportAppService
     {
         var report = await GetRequiredReportAsync(id, cancellationToken);
 
+        await EnsureProjectCanBeSubmittedAsync(report, cancellationToken);
+
         report.Submit();
 
         await _reports.SaveChangesAsync(cancellationToken);
@@ -171,13 +173,44 @@ public sealed class ExpenseReportAppService
 
     private async Task<string?> GetProjectNameAsync(Guid? projectId, CancellationToken cancellationToken)
     {
+        var project = await GetProjectAsync(projectId, cancellationToken);
+        return project?.Name;
+    }
+
+    private async Task<Project?> GetProjectAsync(Guid? projectId, CancellationToken cancellationToken)
+    {
         if (projectId is null)
         {
             return null;
         }
 
-        var project = await _projects.GetByIdAsync(projectId.Value, cancellationToken);
-        return project?.Name;
+        return await _projects.GetByIdAsync(projectId.Value, cancellationToken);
+    }
+
+    private async Task EnsureProjectCanBeSubmittedAsync(
+        ExpenseReport report,
+        CancellationToken cancellationToken)
+    {
+        if (report.ExpenseType != ExpenseType.Project)
+        {
+            return;
+        }
+
+        if (report.ProjectId is null)
+        {
+            throw new DomainRuleViolationException("專案支出報銷單必須選擇專案。");
+        }
+
+        var project = await _projects.GetByIdAsync(report.ProjectId.Value, cancellationToken);
+        if (project is null)
+        {
+            throw new DomainRuleViolationException("找不到指定的專案。");
+        }
+
+        if (project.Status != ProjectStatus.Active)
+        {
+            throw new DomainRuleViolationException("已結案專案的報銷單不可送審。");
+        }
     }
 
     private static ExpenseReportListItemDto MapListItem(ExpenseReport report, string? projectName)
@@ -194,7 +227,10 @@ public sealed class ExpenseReportAppService
             report.TotalAmount.Amount,
             report.CreatedAt);
 
-    private static ExpenseReportDetailDto MapDetails(ExpenseReport report, string? projectName)
+    private static ExpenseReportDetailDto MapDetails(
+        ExpenseReport report,
+        string? projectName,
+        ProjectStatus? projectStatus)
         => new(
             report.Id,
             report.Title,
@@ -203,6 +239,7 @@ public sealed class ExpenseReportAppService
             report.ExpenseType,
             report.ProjectId,
             projectName,
+            projectStatus,
             report.PaymentMethod,
             report.CashAdvanceId,
             report.TotalAmount.Amount,

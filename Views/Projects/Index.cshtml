@@ -12,6 +12,16 @@
     <a class="btn btn-primary" asp-action="Create">新增專案</a>
 </div>
 
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
 @if (Model.Count == 0)
 {
     <div class="alert alert-secondary">目前還沒有專案。</div>
@@ -25,7 +35,9 @@ else
                     <th>專案名稱</th>
                     <th>客戶</th>
                     <th>狀態</th>
+                    <th class="text-end">未完成報銷單</th>
                     <th>建立時間</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -35,7 +47,21 @@ else
                     <td>@project.Name</td>
                     <td>@project.CustomerName</td>
                     <td>@StatusText(project.Status)</td>
+                    <td class="text-end">@project.UnfinishedExpenseReportCount</td>
                     <td>@project.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                    <td class="text-end">
+                        @if (project.Status == ProjectStatus.Active && project.UnfinishedExpenseReportCount == 0)
+                        {
+                            <form asp-action="Close" asp-route-id="@project.Id" method="post" class="d-inline"
+                                  onsubmit="return confirm('確定要將這個專案結案嗎？結案後不可再新增該專案支出報銷單。');">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">結案</button>
+                            </form>
+                        }
+                        else if (project.Status == ProjectStatus.Active)
+                        {
+                            <span class="text-muted small">有未完成報銷單</span>
+                        }
+                    </td>
                 </tr>
             }
             </tbody>
