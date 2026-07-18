@@ -1,5 +1,6 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Projects;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.ExpenseReports;
 using Microsoft.AspNetCore.Mvc;
@@ -10,13 +11,16 @@ public sealed class ExpenseReportsController : Controller
 {
     private readonly ExpenseReportAppService _expenseReports;
     private readonly CashAdvanceAppService _cashAdvances;
+    private readonly ProjectAppService _projects;
 
     public ExpenseReportsController(
         ExpenseReportAppService expenseReports,
-        CashAdvanceAppService cashAdvances)
+        CashAdvanceAppService cashAdvances,
+        ProjectAppService projects)
     {
         _expenseReports = expenseReports;
         _cashAdvances = cashAdvances;
+        _projects = projects;
     }
 
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
@@ -45,6 +49,8 @@ public sealed class ExpenseReportsController : Controller
                 new CreateExpenseReportCommand(
                     form.Title,
                     form.ApplicantName,
+                    form.ExpenseType,
+                    form.ProjectId,
                     form.PaymentMethod,
                     form.CashAdvanceId),
                 cancellationToken);
@@ -198,6 +204,7 @@ public sealed class ExpenseReportsController : Controller
         CreateExpenseReportForm form,
         CancellationToken cancellationToken)
     {
+        form.ProjectOptions = await _projects.ListActiveOptionsAsync(cancellationToken);
         form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
         return form;
     }

@@ -24,6 +24,8 @@
     <div>
         <h1 class="h3 mb-1">@Model.Report.Title</h1>
         <div class="text-muted">申請人：@Model.Report.ApplicantName</div>
+        <div class="text-muted">支出類型：@ExpenseTypeText(Model.Report.ExpenseType)</div>
+        <div class="text-muted">專案：@DisplayProjectName(Model.Report)</div>
         <div class="text-muted">付款方式：@PaymentMethodText(Model.Report.PaymentMethod)</div>
     </div>
     <div class="text-end">
@@ -184,6 +186,16 @@
         ExpensePaymentMethod.CashAdvance => "預支費用",
         _ => paymentMethod.ToString()
     };
+
+    private static string ExpenseTypeText(ExpenseType expenseType) => expenseType switch
+    {
+        ExpenseType.General => "一般支出",
+        ExpenseType.Project => "專案支出",
+        _ => expenseType.ToString()
+    };
+
+    private static string DisplayProjectName(ExpenseReportDetailDto report)
+        => report.ExpenseType == ExpenseType.Project ? report.ProjectName ?? "(找不到專案)" : "-";
 
     private static string ReceiptTypeText(ExpenseReceiptType receiptType) => receiptType switch
     {

@@ -1,5 +1,6 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,7 @@ builder.Logging.AddDebug();
 builder.Services.AddControllersWithViews();
 builder.Services.AddScoped<ExpenseReportAppService>();
 builder.Services.AddScoped<CashAdvanceAppService>();
+builder.Services.AddScoped<ProjectAppService>();
 builder.Services.AddExpenseLiteInfrastructure(builder.Configuration);
 
 var app = builder.Build();

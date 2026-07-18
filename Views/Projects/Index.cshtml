@@ -1,0 +1,53 @@
+@model IReadOnlyList<ProjectListItemDto>
+
+@{
+    ViewData["Title"] = "專案";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h3 mb-1">專案</h1>
+        <div class="text-muted">專案支出報銷單會連到這裡的專案資料</div>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">新增專案</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-secondary">目前還沒有專案。</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>專案名稱</th>
+                    <th>客戶</th>
+                    <th>狀態</th>
+                    <th>建立時間</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var project in Model)
+            {
+                <tr>
+                    <td>@project.Name</td>
+                    <td>@project.CustomerName</td>
+                    <td>@StatusText(project.Status)</td>
+                    <td>@project.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@functions {
+    private static string StatusText(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Active => "進行中",
+        ProjectStatus.Closed => "已結案",
+        _ => status.ToString()
+    };
+}

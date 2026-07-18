@@ -1,8 +1,10 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure.CashAdvances;
 using ExpenseLite.Infrastructure.ExpenseReports;
 using ExpenseLite.Infrastructure.Persistence;
+using ExpenseLite.Infrastructure.Projects;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseLite.Infrastructure;
@@ -28,6 +30,7 @@ public static class DependencyInjection
 
         services.AddScoped<IExpenseReportRepository, EfExpenseReportRepository>();
         services.AddScoped<ICashAdvanceRepository, EfCashAdvanceRepository>();
+        services.AddScoped<IProjectRepository, EfProjectRepository>();
 
         return services;
     }

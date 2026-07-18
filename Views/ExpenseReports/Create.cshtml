@@ -26,6 +26,28 @@
     </div>
 
     <div class="mb-3">
+        <label asp-for="ExpenseType" class="form-label">支出類型</label>
+        <select asp-for="ExpenseType" class="form-select">
+            <option value="@ExpenseType.General">一般支出</option>
+            <option value="@ExpenseType.Project">專案支出</option>
+        </select>
+        <span asp-validation-for="ExpenseType" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="ProjectId" class="form-label">專案</label>
+        <select asp-for="ProjectId" class="form-select">
+            <option value="">不連到專案</option>
+            @foreach (var project in Model.ProjectOptions)
+            {
+                <option value="@project.Id">@project.Name - @project.CustomerName</option>
+            }
+        </select>
+        <div class="form-text">只有支出類型為專案支出時需要選擇。</div>
+        <span asp-validation-for="ProjectId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
         <label asp-for="PaymentMethod" class="form-label">付款方式</label>
         <select asp-for="PaymentMethod" class="form-select">
             <option value="@ExpensePaymentMethod.EmployeePaid">員工墊款</option>

@@ -11,6 +11,7 @@ public sealed class ExpenseReport
     {
         Title = string.Empty;
         ApplicantName = string.Empty;
+        ExpenseType = ExpenseType.General;
         PaymentMethod = ExpensePaymentMethod.EmployeePaid;
         TotalAmount = Money.Zero;
     }
@@ -18,6 +19,8 @@ public sealed class ExpenseReport
     private ExpenseReport(
         string title,
         string applicantName,
+        ExpenseType expenseType,
+        Guid? projectId,
         ExpensePaymentMethod paymentMethod,
         Guid? cashAdvanceId)
     {
@@ -29,6 +32,16 @@ public sealed class ExpenseReport
         if (string.IsNullOrWhiteSpace(applicantName))
         {
             throw new DomainRuleViolationException("申請人不可空白。");
+        }
+
+        if (expenseType == ExpenseType.Project && projectId is null)
+        {
+            throw new DomainRuleViolationException("專案支出報銷單必須選擇專案。");
+        }
+
+        if (expenseType == ExpenseType.General && projectId is not null)
+        {
+            throw new DomainRuleViolationException("一般支出報銷單不可連到專案。");
         }
 
         if (paymentMethod == ExpensePaymentMethod.CashAdvance && cashAdvanceId is null)
@@ -44,6 +57,8 @@ public sealed class ExpenseReport
         Id = Guid.NewGuid();
         Title = title.Trim();
         ApplicantName = applicantName.Trim();
+        ExpenseType = expenseType;
+        ProjectId = projectId;
         PaymentMethod = paymentMethod;
         CashAdvanceId = cashAdvanceId;
         Status = ExpenseReportStatus.Draft;
@@ -58,6 +73,10 @@ public sealed class ExpenseReport
     public string ApplicantName { get; private set; }
 
     public ExpenseReportStatus Status { get; private set; }
+
+    public ExpenseType ExpenseType { get; private set; }
+
+    public Guid? ProjectId { get; private set; }
 
     public ExpensePaymentMethod PaymentMethod { get; private set; }
 
@@ -74,9 +93,11 @@ public sealed class ExpenseReport
     public static ExpenseReport Create(
         string title,
         string applicantName,
+        ExpenseType expenseType,
+        Guid? projectId,
         ExpensePaymentMethod paymentMethod,
         Guid? cashAdvanceId)
-        => new(title, applicantName, paymentMethod, cashAdvanceId);
+        => new(title, applicantName, expenseType, projectId, paymentMethod, cashAdvanceId);
 
     public ExpenseDetail AddDetail(
         DateOnly expenseDate,

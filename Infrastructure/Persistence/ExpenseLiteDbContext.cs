@@ -1,5 +1,6 @@
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.CashAdvances;
+using ExpenseLite.Domain.Projects;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseLite.Infrastructure.Persistence;
@@ -14,6 +15,8 @@ public sealed class ExpenseLiteDbContext : DbContext
     public DbSet<ExpenseReport> ExpenseReports => Set<ExpenseReport>();
 
     public DbSet<CashAdvance> CashAdvances => Set<CashAdvance>();
+
+    public DbSet<Project> Projects => Set<Project>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

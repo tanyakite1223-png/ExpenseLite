@@ -5,6 +5,8 @@ namespace ExpenseLite.Application.ExpenseReports;
 public sealed record CreateExpenseReportCommand(
     string Title,
     string ApplicantName,
+    ExpenseType ExpenseType,
+    Guid? ProjectId,
     ExpensePaymentMethod PaymentMethod,
     Guid? CashAdvanceId);
 

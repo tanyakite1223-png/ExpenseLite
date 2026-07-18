@@ -32,6 +32,15 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(x => x.ExpenseType)
+            .HasColumnName("expense_type")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(x => x.ProjectId)
+            .HasColumnName("project_id");
+
         builder.Property(x => x.PaymentMethod)
             .HasColumnName("payment_method")
             .HasConversion<string>()

@@ -24,6 +24,8 @@ else
                 <tr>
                     <th>標題</th>
                     <th>申請人</th>
+                    <th>支出類型</th>
+                    <th>專案</th>
                     <th>付款方式</th>
                     <th>狀態</th>
                     <th class="text-end">總金額</th>
@@ -37,6 +39,8 @@ else
                 <tr>
                     <td>@report.Title</td>
                     <td>@report.ApplicantName</td>
+                    <td>@ExpenseTypeText(report.ExpenseType)</td>
+                    <td>@DisplayProjectName(report)</td>
                     <td>@PaymentMethodText(report.PaymentMethod)</td>
                     <td>@StatusText(report.Status)</td>
                     <td class="text-end">@report.TotalAmount.ToString("N2")</td>
@@ -68,4 +72,14 @@ else
         ExpensePaymentMethod.CashAdvance => "預支費用",
         _ => paymentMethod.ToString()
     };
+
+    private static string ExpenseTypeText(ExpenseType expenseType) => expenseType switch
+    {
+        ExpenseType.General => "一般支出",
+        ExpenseType.Project => "專案支出",
+        _ => expenseType.ToString()
+    };
+
+    private static string DisplayProjectName(ExpenseReportListItemDto report)
+        => report.ExpenseType == ExpenseType.Project ? report.ProjectName ?? "(找不到專案)" : "-";
 }
