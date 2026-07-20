@@ -7,3 +7,5 @@
 `Project` 自己負責專案生命週期的狀態轉換，目前 `Close()` 會把進行中專案改成已結案，並擋掉重複結案。報銷單建立流程仍在 Application Service 查詢 `Project`，確認專案是 `Active` 才允許建立專案支出；專案結案前也由 Application Service 查詢該專案是否還有 `Draft`、`Submitted`、`Returned` 報銷單。這讓跨 aggregate 查詢留在 Application Service，單一 aggregate 的狀態規則留在 Domain entity。
 
 同一條規則也套用在報銷單送審：如果草稿報銷單連到的專案後來已結案，Application Service 會擋掉送審。這不是 `ExpenseReport` 自己能判斷的事，因為它只保存 `ProjectId`，不知道另一個 aggregate 目前狀態。
+
+專案結案後的查詢也是沿用同一個邊界：報銷單不會被搬進 `Project` aggregate，也不新增一份封存資料表；Project 詳情頁由 Application Service 透過 `ProjectId` 查出相關報銷單，提供結案後的歷史查詢。這裡的「封存」意思是結案專案不再允許新增或送審相關支出，但既有報銷單仍保留在原本的報銷單資料中供查詢。

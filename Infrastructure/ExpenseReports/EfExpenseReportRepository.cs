@@ -22,6 +22,17 @@ public sealed class EfExpenseReportRepository : IExpenseReportRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ExpenseReport>> ListByProjectIdAsync(
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ExpenseReports
+            .AsNoTracking()
+            .Include(x => x.Details)
+            .Where(x => x.ExpenseType == ExpenseType.Project && x.ProjectId == projectId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<ExpenseReport?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.ExpenseReports

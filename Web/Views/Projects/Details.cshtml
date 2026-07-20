@@ -1,0 +1,110 @@
+@model ProjectDetailDto
+
+@{
+    ViewData["Title"] = "專案詳情";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h3 mb-1">@Model.Name</h1>
+        <div class="text-muted">@Model.CustomerName</div>
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Index">返回專案列表</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">狀態</div>
+            <div class="fs-5">@ProjectStatusText(Model.Status)</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">未完成報銷單</div>
+            <div class="fs-5">@Model.UnfinishedExpenseReportCount</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">報銷單總數</div>
+            <div class="fs-5">@Model.ExpenseReports.Count</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">建立時間</div>
+            <div>@Model.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</div>
+        </div>
+    </div>
+</div>
+
+<h2 class="h5 mb-3">相關報銷單</h2>
+
+@if (Model.ExpenseReports.Count == 0)
+{
+    <div class="alert alert-secondary">這個專案目前沒有相關報銷單。</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>標題</th>
+                    <th>申請人</th>
+                    <th>付款方式</th>
+                    <th>狀態</th>
+                    <th class="text-end">總金額</th>
+                    <th>建立時間</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var report in Model.ExpenseReports)
+            {
+                <tr>
+                    <td>@report.Title</td>
+                    <td>@report.ApplicantName</td>
+                    <td>@PaymentMethodText(report.PaymentMethod)</td>
+                    <td>@ReportStatusText(report.Status)</td>
+                    <td class="text-end">@report.TotalAmount.ToString("N2")</td>
+                    <td>@report.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary"
+                           asp-controller="ExpenseReports"
+                           asp-action="Details"
+                           asp-route-id="@report.Id">檢視</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@functions {
+    private static string ProjectStatusText(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Active => "進行中",
+        ProjectStatus.Closed => "已結案",
+        _ => status.ToString()
+    };
+
+    private static string ReportStatusText(ExpenseReportStatus status) => status switch
+    {
+        ExpenseReportStatus.Draft => "草稿",
+        ExpenseReportStatus.Submitted => "送審中",
+        ExpenseReportStatus.Returned => "退回",
+        ExpenseReportStatus.Approved => "已核准",
+        ExpenseReportStatus.Rejected => "已拒絕",
+        _ => status.ToString()
+    };
+
+    private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
+    {
+        ExpensePaymentMethod.EmployeePaid => "員工墊款",
+        ExpensePaymentMethod.CashAdvance => "預支費用",
+        _ => paymentMethod.ToString()
+    };
+}

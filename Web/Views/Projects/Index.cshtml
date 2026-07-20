@@ -1,4 +1,4 @@
-@model IReadOnlyList<ProjectListItemDto>
+@model ProjectListPageDto
 
 @{
     ViewData["Title"] = "專案";
@@ -12,6 +12,25 @@
     <a class="btn btn-primary" asp-action="Create">新增專案</a>
 </div>
 
+<form asp-action="Index" method="get" class="d-flex gap-2 mb-3">
+    <input type="search"
+           name="keyword"
+           value="@Model.Keyword"
+           class="form-control"
+           placeholder="搜尋專案名稱、客戶、狀態"
+           aria-label="搜尋專案" />
+    <button type="submit" class="btn btn-outline-primary">搜尋</button>
+    @if (!string.IsNullOrWhiteSpace(Model.Keyword))
+    {
+        <a class="btn btn-outline-secondary" asp-action="Index">清除</a>
+    }
+</form>
+
+@if (!string.IsNullOrWhiteSpace(Model.Keyword))
+{
+    <div class="text-muted small mb-3">找到 @Model.Projects.Count 筆符合「@Model.Keyword」的專案</div>
+}
+
 @if (TempData["ErrorMessage"] is string errorMessage)
 {
     <div class="alert alert-danger">@errorMessage</div>
@@ -22,9 +41,9 @@
     <div class="alert alert-success">@successMessage</div>
 }
 
-@if (Model.Count == 0)
+@if (Model.Projects.Count == 0)
 {
-    <div class="alert alert-secondary">目前還沒有專案。</div>
+    <div class="alert alert-secondary">@EmptyProjectMessage(Model)</div>
 }
 else
 {
@@ -41,7 +60,7 @@ else
                 </tr>
             </thead>
             <tbody>
-            @foreach (var project in Model)
+            @foreach (var project in Model.Projects)
             {
                 <tr>
                     <td>@project.Name</td>
@@ -50,6 +69,7 @@ else
                     <td class="text-end">@project.UnfinishedExpenseReportCount</td>
                     <td>@project.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
                     <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@project.Id">檢視</a>
                         @if (project.Status == ProjectStatus.Active && project.UnfinishedExpenseReportCount == 0)
                         {
                             <form asp-action="Close" asp-route-id="@project.Id" method="post" class="d-inline"
@@ -76,4 +96,9 @@ else
         ProjectStatus.Closed => "已結案",
         _ => status.ToString()
     };
+
+    private static string EmptyProjectMessage(ProjectListPageDto page)
+        => page.TotalProjectCount == 0
+            ? "目前還沒有專案。"
+            : "沒有符合關鍵字的專案。";
 }

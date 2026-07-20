@@ -6,6 +6,8 @@ public interface IExpenseReportRepository
 {
     Task<IReadOnlyList<ExpenseReport>> ListAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ExpenseReport>> ListByProjectIdAsync(Guid projectId, CancellationToken cancellationToken = default);
+
     Task<ExpenseReport?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<Dictionary<Guid, int>> CountUnfinishedProjectReportsAsync(CancellationToken cancellationToken = default);

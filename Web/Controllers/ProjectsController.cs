@@ -14,10 +14,21 @@ public sealed class ProjectsController : Controller
         _projects = projects;
     }
 
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(string? keyword, CancellationToken cancellationToken)
     {
-        var projects = await _projects.ListAsync(cancellationToken);
+        var projects = await _projects.ListAsync(keyword, cancellationToken);
         return View(projects);
+    }
+
+    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    {
+        var project = await _projects.GetDetailsAsync(id, cancellationToken);
+        if (project is null)
+        {
+            return NotFound();
+        }
+
+        return View(project);
     }
 
     public IActionResult Create()
