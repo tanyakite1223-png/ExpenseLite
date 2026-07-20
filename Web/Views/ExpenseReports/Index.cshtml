@@ -46,6 +46,10 @@ else
                     <td class="text-end">@report.TotalAmount.ToString("N2")</td>
                     <td>@report.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
                     <td class="text-end">
+                        @if (CanEditReport(report.Status))
+                        {
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@report.Id">修改</a>
+                        }
                         <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@report.Id">檢視</a>
                     </td>
                 </tr>
@@ -82,4 +86,7 @@ else
 
     private static string DisplayProjectName(ExpenseReportListItemDto report)
         => report.ExpenseType == ExpenseType.Project ? report.ProjectName ?? "(找不到專案)" : "-";
+
+    private static bool CanEditReport(ExpenseReportStatus status)
+        => status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
 }

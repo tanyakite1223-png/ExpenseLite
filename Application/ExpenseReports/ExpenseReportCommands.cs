@@ -10,6 +10,15 @@ public sealed record CreateExpenseReportCommand(
     ExpensePaymentMethod PaymentMethod,
     Guid? CashAdvanceId);
 
+public sealed record UpdateExpenseReportCommand(
+    Guid Id,
+    string Title,
+    string ApplicantName,
+    ExpenseType ExpenseType,
+    Guid? ProjectId,
+    ExpensePaymentMethod PaymentMethod,
+    Guid? CashAdvanceId);
+
 public sealed record AddExpenseDetailCommand(
     Guid ReportId,
     DateOnly ExpenseDate,

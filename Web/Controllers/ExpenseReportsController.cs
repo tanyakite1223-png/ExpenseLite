@@ -1,6 +1,7 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Projects;
+using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.ExpenseReports;
 using Microsoft.AspNetCore.Mvc;
@@ -73,6 +74,68 @@ public sealed class ExpenseReportsController : Controller
         }
 
         return View(new ExpenseReportDetailsPage { Report = report });
+    }
+
+    public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
+    {
+        var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
+        if (report is null)
+        {
+            return NotFound();
+        }
+
+        if (!CanEditReport(report.Status))
+        {
+            TempData["ErrorMessage"] = "只有草稿或退回的報銷單可以修改。";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var form = new EditExpenseReportForm
+        {
+            Id = report.Id,
+            Title = report.Title,
+            ApplicantName = report.ApplicantName,
+            ExpenseType = report.ExpenseType,
+            ProjectId = report.ProjectId,
+            PaymentMethod = report.PaymentMethod,
+            CashAdvanceId = report.CashAdvanceId
+        };
+
+        return View(await BuildEditFormAsync(form, cancellationToken));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(Guid id, EditExpenseReportForm form, CancellationToken cancellationToken)
+    {
+        form.Id = id;
+
+        if (!ModelState.IsValid)
+        {
+            return View(await BuildEditFormAsync(form, cancellationToken));
+        }
+
+        try
+        {
+            await _expenseReports.UpdateAsync(
+                new UpdateExpenseReportCommand(
+                    id,
+                    form.Title,
+                    form.ApplicantName,
+                    form.ExpenseType,
+                    form.ProjectId,
+                    form.PaymentMethod,
+                    form.CashAdvanceId),
+                cancellationToken);
+
+            TempData["SuccessMessage"] = "報銷單已更新。";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(await BuildEditFormAsync(form, cancellationToken));
+        }
     }
 
     [HttpPost]
@@ -208,4 +271,16 @@ public sealed class ExpenseReportsController : Controller
         form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
         return form;
     }
+
+    private async Task<EditExpenseReportForm> BuildEditFormAsync(
+        EditExpenseReportForm form,
+        CancellationToken cancellationToken)
+    {
+        form.ProjectOptions = await _projects.ListActiveOptionsAsync(cancellationToken);
+        form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
+        return form;
+    }
+
+    private static bool CanEditReport(ExpenseReportStatus status)
+        => status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
 }

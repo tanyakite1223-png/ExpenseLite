@@ -24,35 +24,13 @@ public sealed class ExpenseReport
         ExpensePaymentMethod paymentMethod,
         Guid? cashAdvanceId)
     {
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            throw new DomainRuleViolationException("報銷單標題不可空白。");
-        }
-
-        if (string.IsNullOrWhiteSpace(applicantName))
-        {
-            throw new DomainRuleViolationException("申請人不可空白。");
-        }
-
-        if (expenseType == ExpenseType.Project && projectId is null)
-        {
-            throw new DomainRuleViolationException("專案支出報銷單必須選擇專案。");
-        }
-
-        if (expenseType == ExpenseType.General && projectId is not null)
-        {
-            throw new DomainRuleViolationException("一般支出報銷單不可連到專案。");
-        }
-
-        if (paymentMethod == ExpensePaymentMethod.CashAdvance && cashAdvanceId is null)
-        {
-            throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
-        }
-
-        if (paymentMethod == ExpensePaymentMethod.EmployeePaid && cashAdvanceId is not null)
-        {
-            throw new DomainRuleViolationException("員工墊款報銷單不可連到預支款。");
-        }
+        EnsureBasicInfoIsValid(
+            title,
+            applicantName,
+            expenseType,
+            projectId,
+            paymentMethod,
+            cashAdvanceId);
 
         Id = Guid.NewGuid();
         Title = title.Trim();
@@ -107,7 +85,7 @@ public sealed class ExpenseReport
         string? invoiceNumber,
         Money amount)
     {
-        EnsureEditable();
+        EnsureEditable("報銷單送審後不可修改明細。");
 
         var detail = new ExpenseDetail(
             expenseDate,
@@ -124,7 +102,7 @@ public sealed class ExpenseReport
 
     public void RemoveDetail(Guid detailId)
     {
-        EnsureEditable();
+        EnsureEditable("報銷單送審後不可修改明細。");
 
         var detail = _details.SingleOrDefault(x => x.Id == detailId);
         if (detail is null)
@@ -134,6 +112,31 @@ public sealed class ExpenseReport
 
         _details.Remove(detail);
         RecalculateTotal();
+    }
+
+    public void UpdateBasicInfo(
+        string title,
+        string applicantName,
+        ExpenseType expenseType,
+        Guid? projectId,
+        ExpensePaymentMethod paymentMethod,
+        Guid? cashAdvanceId)
+    {
+        EnsureEditable("只有草稿或退回的報銷單可以修改。");
+        EnsureBasicInfoIsValid(
+            title,
+            applicantName,
+            expenseType,
+            projectId,
+            paymentMethod,
+            cashAdvanceId);
+
+        Title = title.Trim();
+        ApplicantName = applicantName.Trim();
+        ExpenseType = expenseType;
+        ProjectId = projectId;
+        PaymentMethod = paymentMethod;
+        CashAdvanceId = cashAdvanceId;
     }
 
     public void Submit()
@@ -170,11 +173,50 @@ public sealed class ExpenseReport
         Status = ExpenseReportStatus.Rejected;
     }
 
-    private void EnsureEditable()
+    private static void EnsureBasicInfoIsValid(
+        string title,
+        string applicantName,
+        ExpenseType expenseType,
+        Guid? projectId,
+        ExpensePaymentMethod paymentMethod,
+        Guid? cashAdvanceId)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleViolationException("報銷單標題不可空白。");
+        }
+
+        if (string.IsNullOrWhiteSpace(applicantName))
+        {
+            throw new DomainRuleViolationException("申請人不可空白。");
+        }
+
+        if (expenseType == ExpenseType.Project && projectId is null)
+        {
+            throw new DomainRuleViolationException("專案支出報銷單必須選擇專案。");
+        }
+
+        if (expenseType == ExpenseType.General && projectId is not null)
+        {
+            throw new DomainRuleViolationException("一般支出報銷單不可連到專案。");
+        }
+
+        if (paymentMethod == ExpensePaymentMethod.CashAdvance && cashAdvanceId is null)
+        {
+            throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
+        }
+
+        if (paymentMethod == ExpensePaymentMethod.EmployeePaid && cashAdvanceId is not null)
+        {
+            throw new DomainRuleViolationException("員工墊款報銷單不可連到預支款。");
+        }
+    }
+
+    private void EnsureEditable(string message)
     {
         if (Status is not ExpenseReportStatus.Draft and not ExpenseReportStatus.Returned)
         {
-            throw new DomainRuleViolationException("報銷單送審後不可修改明細。");
+            throw new DomainRuleViolationException(message);
         }
     }
 

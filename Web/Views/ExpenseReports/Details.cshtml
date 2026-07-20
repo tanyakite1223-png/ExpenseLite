@@ -39,6 +39,10 @@
     <div class="text-end">
         <div class="badge bg-secondary mb-2">@StatusText(Model.Report.Status)</div>
         <div class="fs-4">@Model.Report.TotalAmount.ToString("N2")</div>
+        @if (canEdit)
+        {
+            <a class="btn btn-outline-primary btn-sm mt-2" asp-action="Edit" asp-route-id="@Model.Report.Id">修改報銷單</a>
+        }
     </div>
 </div>
 

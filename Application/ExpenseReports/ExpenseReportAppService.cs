@@ -48,38 +48,15 @@ public sealed class ExpenseReportAppService
 
     public async Task<Guid> CreateAsync(CreateExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
-        if (command.ExpenseType == ExpenseType.Project)
-        {
-            if (command.ProjectId is null)
-            {
-                throw new DomainRuleViolationException("專案支出報銷單必須選擇專案。");
-            }
-
-            var project = await _projects.GetByIdAsync(command.ProjectId.Value, cancellationToken);
-            if (project is null)
-            {
-                throw new DomainRuleViolationException("找不到指定的專案。");
-            }
-
-            if (project.Status != ProjectStatus.Active)
-            {
-                throw new DomainRuleViolationException("已結案專案不可新增報銷單。");
-            }
-        }
-
-        if (command.PaymentMethod == ExpensePaymentMethod.CashAdvance)
-        {
-            if (command.CashAdvanceId is null)
-            {
-                throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
-            }
-
-            var cashAdvance = await _cashAdvances.GetByIdAsync(command.CashAdvanceId.Value, cancellationToken);
-            if (cashAdvance is null)
-            {
-                throw new DomainRuleViolationException("找不到指定的預支款。");
-            }
-        }
+        await EnsureProjectCanBeUsedAsync(
+            command.ExpenseType,
+            command.ProjectId,
+            "已結案專案不可新增報銷單。",
+            cancellationToken);
+        await EnsureCashAdvanceExistsAsync(
+            command.PaymentMethod,
+            command.CashAdvanceId,
+            cancellationToken);
 
         var report = ExpenseReport.Create(
             command.Title,
@@ -93,6 +70,31 @@ public sealed class ExpenseReportAppService
         await _reports.SaveChangesAsync(cancellationToken);
 
         return report.Id;
+    }
+
+    public async Task UpdateAsync(UpdateExpenseReportCommand command, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(command.Id, cancellationToken);
+
+        await EnsureProjectCanBeUsedAsync(
+            command.ExpenseType,
+            command.ProjectId,
+            "已結案專案不可套用到報銷單。",
+            cancellationToken);
+        await EnsureCashAdvanceExistsAsync(
+            command.PaymentMethod,
+            command.CashAdvanceId,
+            cancellationToken);
+
+        report.UpdateBasicInfo(
+            command.Title,
+            command.ApplicantName,
+            command.ExpenseType,
+            command.ProjectId,
+            command.PaymentMethod,
+            command.CashAdvanceId);
+
+        await _reports.SaveChangesAsync(cancellationToken);
     }
 
     public async Task AddDetailAsync(AddExpenseDetailCommand command, CancellationToken cancellationToken = default)
@@ -162,6 +164,56 @@ public sealed class ExpenseReportAppService
         var report = await _reports.GetByIdAsync(id, cancellationToken);
 
         return report ?? throw new DomainRuleViolationException("找不到指定的報銷單。");
+    }
+
+    private async Task EnsureProjectCanBeUsedAsync(
+        ExpenseType expenseType,
+        Guid? projectId,
+        string closedProjectMessage,
+        CancellationToken cancellationToken)
+    {
+        if (expenseType != ExpenseType.Project)
+        {
+            return;
+        }
+
+        if (projectId is null)
+        {
+            throw new DomainRuleViolationException("專案支出報銷單必須選擇專案。");
+        }
+
+        var project = await _projects.GetByIdAsync(projectId.Value, cancellationToken);
+        if (project is null)
+        {
+            throw new DomainRuleViolationException("找不到指定的專案。");
+        }
+
+        if (project.Status != ProjectStatus.Active)
+        {
+            throw new DomainRuleViolationException(closedProjectMessage);
+        }
+    }
+
+    private async Task EnsureCashAdvanceExistsAsync(
+        ExpensePaymentMethod paymentMethod,
+        Guid? cashAdvanceId,
+        CancellationToken cancellationToken)
+    {
+        if (paymentMethod != ExpensePaymentMethod.CashAdvance)
+        {
+            return;
+        }
+
+        if (cashAdvanceId is null)
+        {
+            throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
+        }
+
+        var cashAdvance = await _cashAdvances.GetByIdAsync(cashAdvanceId.Value, cancellationToken);
+        if (cashAdvance is null)
+        {
+            throw new DomainRuleViolationException("找不到指定的預支款。");
+        }
     }
 
     private async Task<Dictionary<Guid, string>> GetProjectNamesAsync(CancellationToken cancellationToken)
