@@ -1,0 +1,174 @@
+@model CashAdvanceSettlementPage
+
+@{
+    ViewData["Title"] = $"{Model.CashAdvance.PayeeName} 預支款";
+}
+
+<div class="mb-3">
+    <a asp-action="Index">返回列表</a>
+</div>
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+<div class="d-flex align-items-start justify-content-between mb-4">
+    <div>
+        <h1 class="h3 mb-1">@Model.CashAdvance.PayeeName</h1>
+        <div class="text-muted">用途：@Model.CashAdvance.Purpose</div>
+        <div class="text-muted">預支日期：@Model.CashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</div>
+    </div>
+    <div class="text-end">
+        <div class="badge bg-secondary mb-2">@ReconciliationText(Model.CashAdvance.ReconciliationStatus)</div>
+        <div class="fs-4">@Model.CashAdvance.Amount.ToString("N2")</div>
+    </div>
+</div>
+
+<div class="table-responsive mb-4">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th class="text-end">預支金額</th>
+                <th class="text-end">已核准報銷</th>
+                <th class="text-end">差額</th>
+                <th>結清方向</th>
+                <th class="text-end">應結清</th>
+                <th class="text-end">已結清</th>
+                <th class="text-end">尚待結清</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="text-end">@Model.CashAdvance.Amount.ToString("N2")</td>
+                <td class="text-end">@Model.CashAdvance.ApprovedReimbursedAmount.ToString("N2")</td>
+                <td class="text-end">@Model.CashAdvance.Difference.ToString("N2")</td>
+                <td>@SettlementTypeText(Model.CashAdvance.RequiredSettlementType)</td>
+                <td class="text-end">@Model.CashAdvance.RequiredSettlementAmount.ToString("N2")</td>
+                <td class="text-end">@Model.CashAdvance.SettledAmount.ToString("N2")</td>
+                <td class="text-end">@Model.CashAdvance.RemainingSettlementAmount.ToString("N2")</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5 mb-3">結清紀錄</h2>
+
+        @if (Model.CashAdvance.SettlementRecords.Count == 0)
+        {
+            <div class="alert alert-secondary">尚無結清紀錄。</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>結清日期</th>
+                            <th>方向</th>
+                            <th class="text-end">金額</th>
+                            <th>處理人</th>
+                            <th>備註</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var record in Model.CashAdvance.SettlementRecords)
+                    {
+                        <tr>
+                            <td>@record.SettledAt.ToString("yyyy/MM/dd")</td>
+                            <td>@SettlementTypeText(record.SettlementType)</td>
+                            <td class="text-end">@record.Amount.ToString("N2")</td>
+                            <td>@record.HandledBy</td>
+                            <td>@DisplayNote(record.Note)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="col-lg-5">
+        @if (Model.CashAdvance.RemainingSettlementAmount > 0m)
+        {
+            <h2 class="h5 mb-3">新增結清紀錄</h2>
+            <form asp-action="RecordSettlement" asp-route-id="@Model.CashAdvance.Id" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                <input asp-for="Settlement.CashAdvanceId" type="hidden" />
+
+                <div class="mb-3">
+                    <label class="form-label">結清方向</label>
+                    <input class="form-control"
+                           value="@SettlementTypeText(Model.CashAdvance.RequiredSettlementType)"
+                           readonly />
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Settlement.SettledAt" class="form-label">結清日期</label>
+                    <input asp-for="Settlement.SettledAt" type="date" class="form-control" />
+                    <span asp-validation-for="Settlement.SettledAt" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Settlement.Amount" class="form-label">結清金額</label>
+                    <input asp-for="Settlement.Amount" class="form-control" inputmode="decimal" />
+                    <div class="form-text">尚待結清 @Model.CashAdvance.RemainingSettlementAmount.ToString("N2")</div>
+                    <span asp-validation-for="Settlement.Amount" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Settlement.HandledBy" class="form-label">處理人</label>
+                    <input asp-for="Settlement.HandledBy" class="form-control" autocomplete="off" />
+                    <span asp-validation-for="Settlement.HandledBy" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Settlement.Note" class="form-label">備註</label>
+                    <textarea asp-for="Settlement.Note" class="form-control" rows="4"></textarea>
+                    <span asp-validation-for="Settlement.Note" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary">新增紀錄</button>
+            </form>
+        }
+        else
+        {
+            <div class="alert alert-success">這筆預支款已結清。</div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+@functions {
+    private static string ReconciliationText(CashAdvanceReconciliationStatus status)
+        => status switch
+        {
+            CashAdvanceReconciliationStatus.Unreimbursed => "未結清",
+            CashAdvanceReconciliationStatus.Settled => "已結清",
+            CashAdvanceReconciliationStatus.CompanyNeedsToPay => "公司需補付",
+            CashAdvanceReconciliationStatus.EmployeeNeedsToReturn => "員工需繳回",
+            _ => status.ToString()
+        };
+
+    private static string SettlementTypeText(CashAdvanceSettlementType? settlementType)
+        => settlementType switch
+        {
+            CashAdvanceSettlementType.CompanyPaid => "公司補付",
+            CashAdvanceSettlementType.EmployeeReturned => "員工繳回",
+            null => "-",
+            _ => settlementType.ToString() ?? "-"
+        };
+
+    private static string DisplayNote(string note)
+        => string.IsNullOrWhiteSpace(note) ? "-" : note;
+}

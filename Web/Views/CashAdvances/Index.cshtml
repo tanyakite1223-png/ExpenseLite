@@ -7,10 +7,20 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
         <h1 class="h3 mb-1">預支款</h1>
-        <div class="text-muted">追蹤預支款與已核准報銷金額的核對狀態</div>
+        <div class="text-muted">追蹤預支款、已核准報銷與實際結清狀態</div>
     </div>
     <a class="btn btn-primary" asp-action="Create">新增預支款</a>
 </div>
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
 
 <form asp-action="Index" method="get" class="row gy-2 gx-2 align-items-end mb-3">
     <div class="col-12 col-lg-5">
@@ -27,7 +37,7 @@
         <select id="reconciliationStatus" name="reconciliationStatus" class="form-select">
             <option value="">全部</option>
             <option value="@CashAdvanceReconciliationStatus.Unreimbursed" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.Unreimbursed)">未結清</option>
-            <option value="@CashAdvanceReconciliationStatus.Settled" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.Settled)">已對上</option>
+            <option value="@CashAdvanceReconciliationStatus.Settled" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.Settled)">已結清</option>
             <option value="@CashAdvanceReconciliationStatus.CompanyNeedsToPay" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.CompanyNeedsToPay)">公司需補付</option>
             <option value="@CashAdvanceReconciliationStatus.EmployeeNeedsToReturn" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.EmployeeNeedsToReturn)">員工需繳回</option>
         </select>
@@ -62,7 +72,11 @@ else
                     <th class="text-end">預支金額</th>
                     <th class="text-end">已核准報銷</th>
                     <th class="text-end">差額</th>
+                    <th>結清方向</th>
+                    <th class="text-end">已結清</th>
+                    <th class="text-end">尚待結清</th>
                     <th>核對狀態</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -75,7 +89,17 @@ else
                     <td class="text-end">@cashAdvance.Amount.ToString("N2")</td>
                     <td class="text-end">@cashAdvance.ApprovedReimbursedAmount.ToString("N2")</td>
                     <td class="text-end">@cashAdvance.Difference.ToString("N2")</td>
+                    <td>@SettlementTypeText(cashAdvance.RequiredSettlementType)</td>
+                    <td class="text-end">@cashAdvance.SettledAmount.ToString("N2")</td>
+                    <td class="text-end">@cashAdvance.RemainingSettlementAmount.ToString("N2")</td>
                     <td>@ReconciliationText(cashAdvance)</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary"
+                           asp-action="Details"
+                           asp-route-id="@cashAdvance.Id">
+                            @(cashAdvance.RemainingSettlementAmount > 0m ? "記錄結清" : "查看")
+                        </a>
+                    </td>
                 </tr>
             }
             </tbody>
@@ -88,10 +112,19 @@ else
         => cashAdvance.ReconciliationStatus switch
         {
             CashAdvanceReconciliationStatus.Unreimbursed => "未結清",
-            CashAdvanceReconciliationStatus.Settled => "已對上",
+            CashAdvanceReconciliationStatus.Settled => "已結清",
             CashAdvanceReconciliationStatus.CompanyNeedsToPay => "公司需補付",
             CashAdvanceReconciliationStatus.EmployeeNeedsToReturn => "員工需繳回",
             _ => cashAdvance.ReconciliationStatus.ToString()
+        };
+
+    private static string SettlementTypeText(CashAdvanceSettlementType? settlementType)
+        => settlementType switch
+        {
+            CashAdvanceSettlementType.CompanyPaid => "公司補付",
+            CashAdvanceSettlementType.EmployeeReturned => "員工繳回",
+            null => "-",
+            _ => settlementType.ToString() ?? "-"
         };
 
     private static bool HasFilter(CashAdvanceListPageDto page)

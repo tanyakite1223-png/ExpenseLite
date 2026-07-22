@@ -17,6 +17,7 @@ public sealed class EfCashAdvanceRepository : ICashAdvanceRepository
     public async Task<IReadOnlyList<CashAdvance>> ListAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.CashAdvances
+            .Include(x => x.SettlementRecords)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -24,6 +25,7 @@ public sealed class EfCashAdvanceRepository : ICashAdvanceRepository
     public async Task<CashAdvance?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.CashAdvances
+            .Include(x => x.SettlementRecords)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 

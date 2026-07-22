@@ -5,6 +5,8 @@ namespace ExpenseLite.Domain.CashAdvances;
 
 public sealed class CashAdvance
 {
+    private readonly List<CashAdvanceSettlementRecord> _settlementRecords = [];
+
     private CashAdvance()
     {
         PayeeName = string.Empty;
@@ -44,6 +46,26 @@ public sealed class CashAdvance
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    public IReadOnlyCollection<CashAdvanceSettlementRecord> SettlementRecords => _settlementRecords.AsReadOnly();
+
     public static CashAdvance Create(string payeeName, string purpose, DateOnly advancedAt, Money amount)
         => new(payeeName, purpose, advancedAt, amount);
+
+    public CashAdvanceSettlementRecord AddSettlementRecord(
+        CashAdvanceSettlementType settlementType,
+        DateOnly settledAt,
+        Money amount,
+        string handledBy,
+        string? note)
+    {
+        var record = new CashAdvanceSettlementRecord(
+            settlementType,
+            settledAt,
+            amount,
+            handledBy,
+            note);
+        _settlementRecords.Add(record);
+
+        return record;
+    }
 }
