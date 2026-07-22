@@ -112,14 +112,54 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
                 money.Property(x => x.Amount)
                     .HasColumnName("amount")
                     .HasColumnType("numeric(18,2)")
-                    .IsRequired();
+                .IsRequired();
             });
+        });
+
+        builder.OwnsMany(x => x.ReviewRecords, review =>
+        {
+            review.ToTable("expense_review_records");
+
+            review.WithOwner()
+                .HasForeignKey("expense_report_id");
+
+            review.HasKey(x => x.Id);
+
+            review.Property(x => x.Id)
+                .HasColumnName("id")
+                .ValueGeneratedNever();
+
+            review.Property<Guid>("expense_report_id")
+                .HasColumnName("expense_report_id");
+
+            review.Property(x => x.Action)
+                .HasColumnName("action")
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsRequired();
+
+            review.Property(x => x.ReviewerName)
+                .HasColumnName("reviewer_name")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            review.Property(x => x.Reason)
+                .HasColumnName("reason")
+                .HasMaxLength(500)
+                .IsRequired();
+
+            review.Property(x => x.ReviewedAt)
+                .HasColumnName("reviewed_at")
+                .IsRequired();
         });
 
         builder.Navigation(x => x.TotalAmount)
             .IsRequired();
 
         builder.Navigation(x => x.Details)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Navigation(x => x.ReviewRecords)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

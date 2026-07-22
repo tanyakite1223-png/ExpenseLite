@@ -64,4 +64,50 @@ public sealed class ExpenseDetail
     public string InvoiceNumber { get; private set; }
 
     public Money Amount { get; private set; }
+
+    internal void Update(
+        DateOnly expenseDate,
+        string category,
+        string description,
+        ExpenseReceiptType receiptType,
+        string? invoiceNumber,
+        Money amount)
+    {
+        EnsureDetailIsValid(expenseDate, category, description, receiptType, invoiceNumber);
+
+        ExpenseDate = expenseDate;
+        Category = category.Trim();
+        Description = description.Trim();
+        ReceiptType = receiptType;
+        InvoiceNumber = invoiceNumber?.Trim() ?? string.Empty;
+        Amount = amount;
+    }
+
+    private static void EnsureDetailIsValid(
+        DateOnly expenseDate,
+        string category,
+        string description,
+        ExpenseReceiptType receiptType,
+        string? invoiceNumber)
+    {
+        if (expenseDate == default)
+        {
+            throw new DomainRuleViolationException("明細日期不可空白。");
+        }
+
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            throw new DomainRuleViolationException("明細類別不可空白。");
+        }
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            throw new DomainRuleViolationException("明細說明不可空白。");
+        }
+
+        if (receiptType == ExpenseReceiptType.Invoice && string.IsNullOrWhiteSpace(invoiceNumber))
+        {
+            throw new DomainRuleViolationException("單據類型為發票時，發票號碼必填。");
+        }
+    }
 }

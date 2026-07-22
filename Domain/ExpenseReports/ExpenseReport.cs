@@ -6,6 +6,7 @@ namespace ExpenseLite.Domain.ExpenseReports;
 public sealed class ExpenseReport
 {
     private readonly List<ExpenseDetail> _details = [];
+    private readonly List<ExpenseReviewRecord> _reviewRecords = [];
 
     private ExpenseReport()
     {
@@ -68,6 +69,8 @@ public sealed class ExpenseReport
 
     public IReadOnlyCollection<ExpenseDetail> Details => _details.AsReadOnly();
 
+    public IReadOnlyCollection<ExpenseReviewRecord> ReviewRecords => _reviewRecords.AsReadOnly();
+
     public static ExpenseReport Create(
         string title,
         string applicantName,
@@ -114,6 +117,33 @@ public sealed class ExpenseReport
         RecalculateTotal();
     }
 
+    public void UpdateDetail(
+        Guid detailId,
+        DateOnly expenseDate,
+        string category,
+        string description,
+        ExpenseReceiptType receiptType,
+        string? invoiceNumber,
+        Money amount)
+    {
+        EnsureEditable("只有草稿或退回的報銷單可以修改明細。");
+
+        var detail = _details.SingleOrDefault(x => x.Id == detailId);
+        if (detail is null)
+        {
+            throw new DomainRuleViolationException("找不到要修改的報銷明細。");
+        }
+
+        detail.Update(
+            expenseDate,
+            category,
+            description,
+            receiptType,
+            invoiceNumber,
+            amount);
+        RecalculateTotal();
+    }
+
     public void UpdateBasicInfo(
         string title,
         string applicantName,
@@ -155,22 +185,25 @@ public sealed class ExpenseReport
         SubmittedAt = DateTimeOffset.UtcNow;
     }
 
-    public void Return()
+    public void Return(string reviewerName, string reason)
     {
         EnsureSubmitted("只有送審中的報銷單可以退回。");
         Status = ExpenseReportStatus.Returned;
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Returned, reviewerName, reason));
     }
 
-    public void Approve()
+    public void Approve(string reviewerName)
     {
         EnsureSubmitted("只有送審中的報銷單可以核准。");
         Status = ExpenseReportStatus.Approved;
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Approved, reviewerName, null));
     }
 
-    public void Reject()
+    public void Reject(string reviewerName, string reason)
     {
         EnsureSubmitted("只有送審中的報銷單可以拒絕。");
         Status = ExpenseReportStatus.Rejected;
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Rejected, reviewerName, reason));
     }
 
     private static void EnsureBasicInfoIsValid(

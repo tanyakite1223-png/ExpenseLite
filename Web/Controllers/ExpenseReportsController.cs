@@ -65,7 +65,7 @@ public sealed class ExpenseReportsController : Controller
         }
     }
 
-    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Details(Guid id, Guid? editDetailId, CancellationToken cancellationToken)
     {
         var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
         if (report is null)
@@ -73,7 +73,19 @@ public sealed class ExpenseReportsController : Controller
             return NotFound();
         }
 
-        return View(new ExpenseReportDetailsPage { Report = report });
+        var editDetail = editDetailId is null
+            ? null
+            : BuildEditDetailForm(report, editDetailId.Value);
+        if (editDetailId is not null && editDetail is null)
+        {
+            return NotFound();
+        }
+
+        return View(new ExpenseReportDetailsPage
+        {
+            Report = report,
+            EditDetail = editDetail
+        });
     }
 
     public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
@@ -181,6 +193,55 @@ public sealed class ExpenseReportsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateDetail(
+        Guid id,
+        Guid detailId,
+        EditExpenseDetailForm form,
+        CancellationToken cancellationToken)
+    {
+        form.Id = detailId;
+
+        if (!ModelState.IsValid)
+        {
+            var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
+            if (report is null)
+            {
+                return NotFound();
+            }
+
+            return View(nameof(Details), new ExpenseReportDetailsPage
+            {
+                Report = report,
+                EditDetail = form
+            });
+        }
+
+        try
+        {
+            await _expenseReports.UpdateDetailAsync(
+                new UpdateExpenseDetailCommand(
+                    id,
+                    detailId,
+                    form.ExpenseDate,
+                    form.Category,
+                    form.Description,
+                    form.ReceiptType,
+                    form.InvoiceNumber,
+                    form.Amount),
+                cancellationToken);
+
+            TempData["SuccessMessage"] = "明細已更新。";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RemoveDetail(Guid id, Guid detailId, CancellationToken cancellationToken)
     {
         try
@@ -214,11 +275,19 @@ public sealed class ExpenseReportsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Return(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Return(Guid id, ReviewExpenseReportForm form, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            TempData["ErrorMessage"] = GetFirstModelError();
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         try
         {
-            await _expenseReports.ReturnAsync(id, cancellationToken);
+            await _expenseReports.ReturnAsync(
+                new ReviewExpenseReportCommand(id, form.ReviewerName, form.Reason),
+                cancellationToken);
             TempData["SuccessMessage"] = "報銷單已退回。";
         }
         catch (DomainRuleViolationException ex)
@@ -231,11 +300,19 @@ public sealed class ExpenseReportsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Approve(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Approve(Guid id, ReviewExpenseReportForm form, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            TempData["ErrorMessage"] = GetFirstModelError();
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         try
         {
-            await _expenseReports.ApproveAsync(id, cancellationToken);
+            await _expenseReports.ApproveAsync(
+                new ReviewExpenseReportCommand(id, form.ReviewerName, form.Reason),
+                cancellationToken);
             TempData["SuccessMessage"] = "報銷單已核准。";
         }
         catch (DomainRuleViolationException ex)
@@ -248,11 +325,19 @@ public sealed class ExpenseReportsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Reject(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Reject(Guid id, ReviewExpenseReportForm form, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            TempData["ErrorMessage"] = GetFirstModelError();
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         try
         {
-            await _expenseReports.RejectAsync(id, cancellationToken);
+            await _expenseReports.RejectAsync(
+                new ReviewExpenseReportCommand(id, form.ReviewerName, form.Reason),
+                cancellationToken);
             TempData["SuccessMessage"] = "報銷單已拒絕。";
         }
         catch (DomainRuleViolationException ex)
@@ -283,4 +368,31 @@ public sealed class ExpenseReportsController : Controller
 
     private static bool CanEditReport(ExpenseReportStatus status)
         => status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
+
+    private static EditExpenseDetailForm? BuildEditDetailForm(ExpenseReportDetailDto report, Guid detailId)
+    {
+        var detail = report.Details.SingleOrDefault(x => x.Id == detailId);
+        if (detail is null)
+        {
+            return null;
+        }
+
+        return new EditExpenseDetailForm
+        {
+            Id = detail.Id,
+            ExpenseDate = detail.ExpenseDate,
+            Category = detail.Category,
+            Description = detail.Description,
+            ReceiptType = detail.ReceiptType,
+            InvoiceNumber = detail.InvoiceNumber,
+            Amount = detail.Amount
+        };
+    }
+
+    private string GetFirstModelError()
+        => ModelState.Values
+            .SelectMany(x => x.Errors)
+            .Select(x => x.ErrorMessage)
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+            ?? "表單資料不完整。";
 }

@@ -7,4 +7,8 @@ public sealed class ExpenseReportDetailsPage
     public required ExpenseReportDetailDto Report { get; init; }
 
     public AddExpenseDetailForm NewDetail { get; init; } = new();
+
+    public EditExpenseDetailForm? EditDetail { get; init; }
+
+    public ReviewExpenseReportForm Review { get; init; } = new();
 }

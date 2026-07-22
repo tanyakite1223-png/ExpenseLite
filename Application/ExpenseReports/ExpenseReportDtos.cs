@@ -30,7 +30,8 @@ public sealed record ExpenseReportDetailDto(
     decimal TotalAmount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SubmittedAt,
-    IReadOnlyList<ExpenseDetailDto> Details);
+    IReadOnlyList<ExpenseDetailDto> Details,
+    IReadOnlyList<ExpenseReviewRecordDto> ReviewRecords);
 
 public sealed record ExpenseDetailDto(
     Guid Id,
@@ -40,3 +41,10 @@ public sealed record ExpenseDetailDto(
     ExpenseReceiptType ReceiptType,
     string InvoiceNumber,
     decimal Amount);
+
+public sealed record ExpenseReviewRecordDto(
+    Guid Id,
+    ExpenseReviewAction Action,
+    string ReviewerName,
+    string Reason,
+    DateTimeOffset ReviewedAt);

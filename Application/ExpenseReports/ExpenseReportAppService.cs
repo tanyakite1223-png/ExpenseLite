@@ -121,6 +121,22 @@ public sealed class ExpenseReportAppService
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateDetailAsync(UpdateExpenseDetailCommand command, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+
+        report.UpdateDetail(
+            command.DetailId,
+            command.ExpenseDate,
+            command.Category,
+            command.Description,
+            command.ReceiptType,
+            command.InvoiceNumber,
+            Money.From(command.Amount));
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SubmitAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var report = await GetRequiredReportAsync(id, cancellationToken);
@@ -132,29 +148,29 @@ public sealed class ExpenseReportAppService
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task ReturnAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task ReturnAsync(ReviewExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
-        var report = await GetRequiredReportAsync(id, cancellationToken);
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
 
-        report.Return();
+        report.Return(command.ReviewerName, command.Reason ?? string.Empty);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task ApproveAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task ApproveAsync(ReviewExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
-        var report = await GetRequiredReportAsync(id, cancellationToken);
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
 
-        report.Approve();
+        report.Approve(command.ReviewerName);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RejectAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task RejectAsync(ReviewExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
-        var report = await GetRequiredReportAsync(id, cancellationToken);
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
 
-        report.Reject();
+        report.Reject(command.ReviewerName, command.Reason ?? string.Empty);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }
@@ -307,5 +323,14 @@ public sealed class ExpenseReportAppService
                     x.ReceiptType,
                     x.InvoiceNumber,
                     x.Amount.Amount))
+                .ToList(),
+            report.ReviewRecords
+                .OrderByDescending(x => x.ReviewedAt)
+                .Select(x => new ExpenseReviewRecordDto(
+                    x.Id,
+                    x.Action,
+                    x.ReviewerName,
+                    x.Reason,
+                    x.ReviewedAt))
                 .ToList());
 }

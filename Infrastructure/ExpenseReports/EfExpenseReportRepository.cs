@@ -37,6 +37,7 @@ public sealed class EfExpenseReportRepository : IExpenseReportRepository
     {
         return await _dbContext.ExpenseReports
             .Include(x => x.Details)
+            .Include(x => x.ReviewRecords)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
