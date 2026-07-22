@@ -1,4 +1,4 @@
-@model IReadOnlyList<CashAdvanceListItemDto>
+@model CashAdvanceListPageDto
 
 @{
     ViewData["Title"] = "預支款";
@@ -12,9 +12,43 @@
     <a class="btn btn-primary" asp-action="Create">新增預支款</a>
 </div>
 
-@if (Model.Count == 0)
+<form asp-action="Index" method="get" class="row gy-2 gx-2 align-items-end mb-3">
+    <div class="col-12 col-lg-5">
+        <label class="form-label" for="keyword">關鍵字</label>
+        <input type="search"
+               id="keyword"
+               name="keyword"
+               value="@Model.Keyword"
+               class="form-control"
+               placeholder="搜尋領款人、用途" />
+    </div>
+    <div class="col-12 col-md-5 col-lg-3">
+        <label class="form-label" for="reconciliationStatus">核對狀態</label>
+        <select id="reconciliationStatus" name="reconciliationStatus" class="form-select">
+            <option value="">全部</option>
+            <option value="@CashAdvanceReconciliationStatus.Unreimbursed" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.Unreimbursed)">未結清</option>
+            <option value="@CashAdvanceReconciliationStatus.Settled" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.Settled)">已對上</option>
+            <option value="@CashAdvanceReconciliationStatus.CompanyNeedsToPay" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.CompanyNeedsToPay)">公司需補付</option>
+            <option value="@CashAdvanceReconciliationStatus.EmployeeNeedsToReturn" selected="@(Model.ReconciliationStatus == CashAdvanceReconciliationStatus.EmployeeNeedsToReturn)">員工需繳回</option>
+        </select>
+    </div>
+    <div class="col-12 col-lg-auto d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary">篩選</button>
+        @if (HasFilter(Model))
+        {
+            <a class="btn btn-outline-secondary" asp-action="Index">清除</a>
+        }
+    </div>
+</form>
+
+@if (HasFilter(Model))
 {
-    <div class="alert alert-secondary">目前還沒有預支款。</div>
+    <div class="text-muted small mb-3">找到 @Model.CashAdvances.Count 筆符合篩選的預支款</div>
+}
+
+@if (Model.CashAdvances.Count == 0)
+{
+    <div class="alert alert-secondary">@EmptyCashAdvanceMessage(Model)</div>
 }
 else
 {
@@ -32,7 +66,7 @@ else
                 </tr>
             </thead>
             <tbody>
-            @foreach (var cashAdvance in Model)
+            @foreach (var cashAdvance in Model.CashAdvances)
             {
                 <tr>
                     <td>@cashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</td>
@@ -51,19 +85,21 @@ else
 
 @functions {
     private static string ReconciliationText(CashAdvanceListItemDto cashAdvance)
-    {
-        if (cashAdvance.IsSettled)
+        => cashAdvance.ReconciliationStatus switch
         {
-            return "已對上";
-        }
+            CashAdvanceReconciliationStatus.Unreimbursed => "未結清",
+            CashAdvanceReconciliationStatus.Settled => "已對上",
+            CashAdvanceReconciliationStatus.CompanyNeedsToPay => "公司需補付",
+            CashAdvanceReconciliationStatus.EmployeeNeedsToReturn => "員工需繳回",
+            _ => cashAdvance.ReconciliationStatus.ToString()
+        };
 
-        if (cashAdvance.ApprovedReimbursedAmount == 0m)
-        {
-            return "未結清";
-        }
+    private static bool HasFilter(CashAdvanceListPageDto page)
+        => !string.IsNullOrWhiteSpace(page.Keyword) ||
+           page.ReconciliationStatus is not null;
 
-        return cashAdvance.Difference > 0m
-            ? "公司需補付"
-            : "員工需繳回";
-    }
+    private static string EmptyCashAdvanceMessage(CashAdvanceListPageDto page)
+        => page.TotalCashAdvanceCount == 0
+            ? "目前還沒有預支款。"
+            : "沒有符合篩選條件的預支款。";
 }

@@ -16,6 +16,20 @@ public sealed record ExpenseReportListItemDto(
     decimal TotalAmount,
     DateTimeOffset CreatedAt);
 
+public sealed record ExpenseReportListQuery(
+    string? Keyword,
+    ExpenseReportStatus? Status,
+    ExpenseType? ExpenseType,
+    ExpensePaymentMethod? PaymentMethod);
+
+public sealed record ExpenseReportListPageDto(
+    string Keyword,
+    ExpenseReportStatus? Status,
+    ExpenseType? ExpenseType,
+    ExpensePaymentMethod? PaymentMethod,
+    int TotalExpenseReportCount,
+    IReadOnlyList<ExpenseReportListItemDto> Reports);
+
 public sealed record ExpenseReportDetailDto(
     Guid Id,
     string Title,

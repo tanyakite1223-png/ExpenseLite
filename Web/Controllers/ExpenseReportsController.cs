@@ -24,10 +24,18 @@ public sealed class ExpenseReportsController : Controller
         _projects = projects;
     }
 
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? keyword,
+        ExpenseReportStatus? status,
+        ExpenseType? expenseType,
+        ExpensePaymentMethod? paymentMethod,
+        CancellationToken cancellationToken)
     {
-        var reports = await _expenseReports.ListAsync(cancellationToken);
-        return View(reports);
+        var page = await _expenseReports.ListPageAsync(
+            new ExpenseReportListQuery(keyword, status, expenseType, paymentMethod),
+            cancellationToken);
+
+        return View(page);
     }
 
     public async Task<IActionResult> Create(CancellationToken cancellationToken)

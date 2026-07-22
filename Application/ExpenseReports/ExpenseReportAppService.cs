@@ -34,6 +34,29 @@ public sealed class ExpenseReportAppService
             .ToList();
     }
 
+    public async Task<ExpenseReportListPageDto> ListPageAsync(
+        ExpenseReportListQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var reports = await _reports.ListAsync(cancellationToken);
+        var projectNames = await GetProjectNamesAsync(cancellationToken);
+        var normalizedKeyword = NormalizeKeyword(query.Keyword);
+
+        var items = reports
+            .Where(x => MatchesFilter(x, normalizedKeyword, query))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => MapListItem(x, projectNames.GetValueOrDefault(x.ProjectId ?? Guid.Empty)))
+            .ToList();
+
+        return new ExpenseReportListPageDto(
+            normalizedKeyword,
+            query.Status,
+            query.ExpenseType,
+            query.PaymentMethod,
+            reports.Count,
+            items);
+    }
+
     public async Task<ExpenseReportDetailDto?> GetDetailsAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var report = await _reports.GetByIdAsync(id, cancellationToken);
@@ -294,6 +317,46 @@ public sealed class ExpenseReportAppService
             report.CashAdvanceId,
             report.TotalAmount.Amount,
             report.CreatedAt);
+
+    private static bool MatchesFilter(
+        ExpenseReport report,
+        string keyword,
+        ExpenseReportListQuery query)
+    {
+        if (query.Status is not null && report.Status != query.Status)
+        {
+            return false;
+        }
+
+        if (query.ExpenseType is not null && report.ExpenseType != query.ExpenseType)
+        {
+            return false;
+        }
+
+        if (query.PaymentMethod is not null && report.PaymentMethod != query.PaymentMethod)
+        {
+            return false;
+        }
+
+        return MatchesKeyword(report, keyword);
+    }
+
+    private static bool MatchesKeyword(ExpenseReport report, string keyword)
+    {
+        if (keyword.Length == 0)
+        {
+            return true;
+        }
+
+        return ContainsKeyword(report.Title, keyword) ||
+               ContainsKeyword(report.ApplicantName, keyword);
+    }
+
+    private static string NormalizeKeyword(string? keyword)
+        => string.IsNullOrWhiteSpace(keyword) ? string.Empty : keyword.Trim();
+
+    private static bool ContainsKeyword(string value, string keyword)
+        => value.Contains(keyword, StringComparison.OrdinalIgnoreCase);
 
     private static ExpenseReportDetailDto MapDetails(
         ExpenseReport report,

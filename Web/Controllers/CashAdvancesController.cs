@@ -14,10 +14,16 @@ public sealed class CashAdvancesController : Controller
         _cashAdvances = cashAdvances;
     }
 
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? keyword,
+        CashAdvanceReconciliationStatus? reconciliationStatus,
+        CancellationToken cancellationToken)
     {
-        var cashAdvances = await _cashAdvances.ListAsync(cancellationToken);
-        return View(cashAdvances);
+        var page = await _cashAdvances.ListPageAsync(
+            new CashAdvanceListQuery(keyword, reconciliationStatus),
+            cancellationToken);
+
+        return View(page);
     }
 
     public IActionResult Create()

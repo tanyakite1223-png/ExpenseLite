@@ -1,4 +1,4 @@
-@model IReadOnlyList<ExpenseReportListItemDto>
+@model ExpenseReportListPageDto
 
 @{
     ViewData["Title"] = "報銷單";
@@ -12,9 +12,60 @@
     <a class="btn btn-primary" asp-action="Create">新增報銷單</a>
 </div>
 
-@if (Model.Count == 0)
+<form asp-action="Index" method="get" class="row gy-2 gx-2 align-items-end mb-3">
+    <div class="col-12 col-lg-4">
+        <label class="form-label" for="keyword">關鍵字</label>
+        <input type="search"
+               id="keyword"
+               name="keyword"
+               value="@Model.Keyword"
+               class="form-control"
+               placeholder="搜尋標題、申請人" />
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+        <label class="form-label" for="status">狀態</label>
+        <select id="status" name="status" class="form-select">
+            <option value="">全部</option>
+            <option value="@ExpenseReportStatus.Draft" selected="@(Model.Status == ExpenseReportStatus.Draft)">草稿</option>
+            <option value="@ExpenseReportStatus.Submitted" selected="@(Model.Status == ExpenseReportStatus.Submitted)">送審中</option>
+            <option value="@ExpenseReportStatus.Returned" selected="@(Model.Status == ExpenseReportStatus.Returned)">退回</option>
+            <option value="@ExpenseReportStatus.Approved" selected="@(Model.Status == ExpenseReportStatus.Approved)">已核准</option>
+            <option value="@ExpenseReportStatus.Rejected" selected="@(Model.Status == ExpenseReportStatus.Rejected)">已拒絕</option>
+        </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+        <label class="form-label" for="expenseType">支出類型</label>
+        <select id="expenseType" name="expenseType" class="form-select">
+            <option value="">全部</option>
+            <option value="@ExpenseType.General" selected="@(Model.ExpenseType == ExpenseType.General)">一般支出</option>
+            <option value="@ExpenseType.Project" selected="@(Model.ExpenseType == ExpenseType.Project)">專案支出</option>
+        </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+        <label class="form-label" for="paymentMethod">付款方式</label>
+        <select id="paymentMethod" name="paymentMethod" class="form-select">
+            <option value="">全部</option>
+            <option value="@ExpensePaymentMethod.EmployeePaid" selected="@(Model.PaymentMethod == ExpensePaymentMethod.EmployeePaid)">員工墊款</option>
+            <option value="@ExpensePaymentMethod.CashAdvance" selected="@(Model.PaymentMethod == ExpensePaymentMethod.CashAdvance)">預支費用</option>
+        </select>
+    </div>
+    <div class="col-12 col-lg-auto d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary">篩選</button>
+        @if (HasFilter(Model))
+        {
+            <a class="btn btn-outline-secondary" asp-action="Index">清除</a>
+        }
+    </div>
+</form>
+
+@if (HasFilter(Model))
 {
-    <div class="alert alert-secondary">目前還沒有報銷單。</div>
+    <div class="text-muted small mb-3">找到 @Model.Reports.Count 筆符合篩選的報銷單</div>
+}
+
+@if (Model.Reports.Count == 0)
+{
+    <div class="alert alert-secondary">@EmptyReportMessage(Model)</div>
 }
 else
 {
@@ -34,7 +85,7 @@ else
                 </tr>
             </thead>
             <tbody>
-            @foreach (var report in Model)
+            @foreach (var report in Model.Reports)
             {
                 <tr>
                     <td>@report.Title</td>
@@ -89,4 +140,15 @@ else
 
     private static bool CanEditReport(ExpenseReportStatus status)
         => status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
+
+    private static bool HasFilter(ExpenseReportListPageDto page)
+        => !string.IsNullOrWhiteSpace(page.Keyword) ||
+           page.Status is not null ||
+           page.ExpenseType is not null ||
+           page.PaymentMethod is not null;
+
+    private static string EmptyReportMessage(ExpenseReportListPageDto page)
+        => page.TotalExpenseReportCount == 0
+            ? "目前還沒有報銷單。"
+            : "沒有符合篩選條件的報銷單。";
 }
