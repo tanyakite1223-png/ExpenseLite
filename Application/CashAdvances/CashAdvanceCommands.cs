@@ -6,6 +6,11 @@ public sealed record CreateCashAdvanceCommand(
     DateOnly AdvancedAt,
     decimal Amount);
 
+public sealed record UpdateCashAdvanceCommand(
+    Guid CashAdvanceId,
+    string Purpose,
+    decimal Amount);
+
 public sealed record RecordCashAdvanceSettlementCommand(
     Guid CashAdvanceId,
     DateOnly SettledAt,

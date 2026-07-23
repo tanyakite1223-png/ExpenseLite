@@ -100,11 +100,18 @@ else
                         }
                     </td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary"
-                           asp-action="Details"
-                           asp-route-id="@cashAdvance.Id">
-                            @ActionText(cashAdvance)
-                        </a>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="預支款操作">
+                            <a class="btn btn-outline-primary"
+                               asp-action="Details"
+                               asp-route-id="@cashAdvance.Id">
+                                @ActionText(cashAdvance)
+                            </a>
+                            <a class="btn btn-outline-secondary"
+                               asp-action="Edit"
+                               asp-route-id="@cashAdvance.Id">
+                                修改
+                            </a>
+                        </div>
                     </td>
                 </tr>
             }

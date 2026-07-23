@@ -3,11 +3,35 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-07-23 — 預支款結清紀錄修改與不採用（未 commit）
+> 最後更新：2026-07-23 — 預支款用途與金額修改（未 commit）
 
 ---
 
 ## 本次 session 摘要
+
+- 上一段「預支款結清紀錄修改與不採用」已完成 commit / push：
+  - 最新已推送 commit：`6dc4191 feat: 新增預支款結清紀錄修改與不採用`。
+  - 本 handoff 先前仍寫「未 commit」，本次已校正。
+- 本次新增「預支款修改」：
+  - 新增 `/CashAdvances/Edit/{id}` 修改頁。
+  - 預支款列表與詳情頁新增「修改」入口。
+  - 修改範圍限定為 `用途`、`預支金額`。
+  - 用途可直接修改。
+  - 預支金額只有在「沒有任何報銷單引用」且「沒有已計入核對的結清紀錄」時可修改。
+  - 若已有報銷單引用，Application Service 會擋金額修改。
+  - 若已有已計入核對的結清紀錄，`CashAdvance` aggregate root 會擋金額修改。
+  - 本次沒有新增 migration，因為只修改既有欄位。
+  - 本次沒有新增 NuGet 套件。
+- 驗證：
+  - `dotnet build` 成功，0 warning / 0 error。
+  - smoke test 成功：
+    - `/CashAdvances` 回 200。
+    - `/CashAdvances/Edit/bcf283d7-1c3b-4892-95d6-d2f9a6ea3f6d` 回 200。
+    - 對已有報銷單引用的預支款 POST 修改金額會被擋下，頁面顯示「已有報銷單使用這筆預支款時，不可修改預支金額。」。
+  - `git diff --check` 無 whitespace error；只有 Windows LF/CRLF 提醒。
+  - smoke test 後曾停止 dev server；最後為 Amber 實測重新啟動於 `http://localhost:5080`，PID `26260`。
+
+## 前一段結清功能狀態
 
 - 本次原本實作「預支款結清紀錄修改 / 刪除 / 沖銷」，後續經 Amber 判斷不想把系統擴大成會計帳，已收斂為「修改 + 標記為不採用」。
 - 已移除沖銷設計：
@@ -90,6 +114,7 @@
   - 退回 / 拒絕時記錄原因
   - 報銷單詳細頁顯示審核紀錄
   - 預支款建立與核對列表
+  - 預支款用途與金額修改
   - 預支款列表篩選：關鍵字、核對狀態
   - 預支款實際結清紀錄：公司補付 / 員工繳回
   - 預支款詳情頁顯示結清紀錄
@@ -107,7 +132,7 @@
   - 專案列表 keyword 查詢
   - 專案詳情頁可查詢該專案全部相關報銷單，結案後仍可作為歷史查詢
 - 進行中 / 未完成：
-  - 今日「修改 + 不採用」功能已實作並驗證，但尚未 commit。
+  - 今日「預支款用途與金額修改」已實作並驗證，但尚未 commit。
   - 尚未有使用者 / 角色 / 權限，目前仍手動輸入申請人、審核人、結清處理人、不採用處理人。
   - 尚未有附件或發票照片上傳。
   - 審核流程尚未記錄真正的登入使用者，也尚未限制誰可以核准 / 退回 / 拒絕。
@@ -117,7 +142,7 @@
   - `dotnet build` 成功。
   - 桌機本機 DB 已套用最新 migration `20260722145229_AddCashAdvanceSettlementRecordVoiding`。
   - 本機連線字串透過 user secrets 設定，不寫入 repo。
-  - dev server 目前已停掉；要跑網站可重新執行 `dotnet run --urls http://localhost:5080`。
+  - dev server 目前為 Amber 實測已啟動於 `http://localhost:5080`，PID `26260`；重新 `dotnet build` 前若遇到鎖檔，先停掉該 process。
 
 ## 架構狀態
 
@@ -161,7 +186,9 @@
   - `ExpenseDetail` 與 `ExpenseReviewRecord` 仍只透過 `ExpenseReport` 操作，沒有獨立 repository。
   - `CashAdvance` 是獨立 aggregate root；報銷單只用 `CashAdvanceId` 參照，符合跨 aggregate 用 ID 的規範。
   - `CashAdvanceSettlementRecord` 只透過 `CashAdvance` 操作，沒有獨立 repository。
+  - `CashAdvance.UpdateBasicInfo(...)` 負責用途與金額的基本規則；已計入核對的結清紀錄存在時不可改預支金額。
   - 結清紀錄修改與標記為不採用屬於 `CashAdvance` aggregate 內部 entity 的操作，所以放在 `CashAdvance` root。
+  - 預支款是否已有報銷單引用屬跨 aggregate 查詢，所以放在 `CashAdvanceAppService`，沒有塞進 `CashAdvance` entity。
   - 預支款差額 / 尚待結清金額 / 流程中報銷單判斷需要跨 `CashAdvance` 與 `ExpenseReport` 查詢，所以放在 `CashAdvanceAppService` 組 DTO，沒有塞進 Domain entity。
   - 本階段刻意不做沖銷，避免進入會計帳 / 出納日記帳範圍。
   - `Project` 是獨立 aggregate root；報銷單只用 `ProjectId` 參照，沒有把整顆 Project 放進報銷單 aggregate。
@@ -197,10 +224,9 @@
 
 ## 待 Amber 決定 / 待辦
 
-- 明天優先：
-  - 確認「不採用此筆結清紀錄」文案是否足夠清楚。
-  - 再跑 build、smoke test。
-  - 若確認可收尾，更新 handoff 後 commit / push。
+- 本段收尾：
+  - Amber 可實測預支款修改：剛新增且未被報銷單使用的預支款可改用途與金額；已被報銷單引用或已有已計入核對結清紀錄者只能改用途。
+  - 若確認可收尾，下一步適合 commit / push 本次預支款修改功能。
 - 應用面下一步建議：
   - 可補「附件或發票照片上傳」，但會牽涉檔案儲存、安全性與大小限制。
   - 可另開「已核准報銷單更正 / 取消核准」流程，用來處理已核准後才發現選錯預支款、報銷單不成立、或需要從預支款核對中排除的情境。
@@ -213,34 +239,25 @@
 ## git 狀態
 
 - 已存在的最新 commit：
-  - `4765278 docs: 更新預支款結清 handoff`
+  - `6dc4191 feat: 新增預支款結清紀錄修改與不採用`
 - push 狀態：
-  - `4765278` 已在 `origin/main`。
-  - `git status --short --branch` 顯示 `## main...origin/main`，目前沒有 ahead / behind。
+  - `6dc4191` 已在 `origin/main`。
+  - 本次開始前 `git status --short --branch` 顯示 `## main...origin/main`。
 - 目前有未 commit 變更：
   - `Application/CashAdvances/CashAdvanceAppService.cs`
   - `Application/CashAdvances/CashAdvanceCommands.cs`
   - `Application/CashAdvances/CashAdvanceDtos.cs`
   - `Domain/CashAdvances/CashAdvance.cs`
-  - `Domain/CashAdvances/CashAdvanceSettlementRecord.cs`
-  - `Infrastructure/Persistence/CashAdvanceConfiguration.cs`
-  - `Infrastructure/Persistence/Migrations/ExpenseLiteDbContextModelSnapshot.cs`
-  - `Infrastructure/Persistence/Migrations/20260722145229_AddCashAdvanceSettlementRecordVoiding.cs`
-  - `Infrastructure/Persistence/Migrations/20260722145229_AddCashAdvanceSettlementRecordVoiding.Designer.cs`
   - `Web/Controllers/CashAdvancesController.cs`
-  - `Web/ViewModels/CashAdvances/CashAdvanceSettlementRecordActionPages.cs`
-  - `Web/ViewModels/CashAdvances/EditCashAdvanceSettlementForm.cs`
-  - `Web/ViewModels/CashAdvances/VoidCashAdvanceSettlementForm.cs`
+  - `Web/ViewModels/CashAdvances/EditCashAdvanceForm.cs`
+  - `Web/ViewModels/CashAdvances/EditCashAdvancePage.cs`
   - `Web/Views/CashAdvances/Details.cshtml`
-  - `Web/Views/CashAdvances/EditSettlement.cshtml`
+  - `Web/Views/CashAdvances/Edit.cshtml`
   - `Web/Views/CashAdvances/Index.cshtml`
-  - `Web/Views/CashAdvances/VoidSettlement.cshtml`
   - `docs/architecture/cash-advance-reconciliation.md`
   - `.claude/current-handoff.md`
-  - `.claude/handoff-archive/handoff-20260722-2343.md`
 - 本次 handoff：
-  - 舊 handoff 已歸檔到 `.claude/handoff-archive/handoff-20260722-2343.md`。
-  - 本檔已更新為明天可接續的未 commit 狀態。
+  - 本檔已更新為目前可接續的未 commit 狀態。
 - 建議 commit message：
-  - `feat: 新增預支款結清紀錄修改與不採用`
+  - `feat: 新增預支款修改功能`
 - 後續若要 git add / commit / push，仍需依 CLAUDE.md 規定先列出指令、範圍與 commit message，取得 Amber 明確確認後才能執行。

@@ -1,0 +1,59 @@
+@model EditCashAdvancePage
+
+@{
+    ViewData["Title"] = "修改預支款";
+}
+
+<div class="mb-3">
+    <a asp-action="Details" asp-route-id="@Model.CashAdvance.Id">返回預支款</a>
+</div>
+
+<h1 class="h3 mb-3">修改預支款</h1>
+
+<div class="table-responsive col-lg-6 mb-4">
+    <table class="table table-sm align-middle">
+        <tbody>
+            <tr>
+                <th class="w-25">領款人</th>
+                <td>@Model.CashAdvance.PayeeName</td>
+            </tr>
+            <tr>
+                <th>預支日期</th>
+                <td>@Model.CashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<form asp-action="Edit" asp-route-id="@Model.CashAdvance.Id" method="post" class="col-lg-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    <input asp-for="CashAdvanceForm.CashAdvanceId" type="hidden" />
+
+    <div class="mb-3">
+        <label asp-for="CashAdvanceForm.Purpose" class="form-label">預支用途</label>
+        <input asp-for="CashAdvanceForm.Purpose" class="form-control" autocomplete="off" />
+        <span asp-validation-for="CashAdvanceForm.Purpose" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="CashAdvanceForm.Amount" class="form-label">預支金額</label>
+        <input asp-for="CashAdvanceForm.Amount"
+               class="form-control"
+               inputmode="decimal"
+               readonly="@(!Model.CashAdvance.CanEditAmount)" />
+        @if (!Model.CashAdvance.CanEditAmount)
+        {
+            <div class="form-text">已有報銷單或已採用結清紀錄時，預支金額不可修改。</div>
+        }
+        <span asp-validation-for="CashAdvanceForm.Amount" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">儲存</button>
+    <a class="btn btn-outline-secondary"
+       asp-action="Details"
+       asp-route-id="@Model.CashAdvance.Id">取消</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

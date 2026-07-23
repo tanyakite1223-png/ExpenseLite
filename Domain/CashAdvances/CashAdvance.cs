@@ -21,10 +21,7 @@ public sealed class CashAdvance
             throw new DomainRuleViolationException("領款人不可空白。");
         }
 
-        if (string.IsNullOrWhiteSpace(purpose))
-        {
-            throw new DomainRuleViolationException("預支用途不可空白。");
-        }
+        ValidatePurposeAndAmount(purpose, amount);
 
         Id = Guid.NewGuid();
         PayeeName = payeeName.Trim();
@@ -50,6 +47,19 @@ public sealed class CashAdvance
 
     public static CashAdvance Create(string payeeName, string purpose, DateOnly advancedAt, Money amount)
         => new(payeeName, purpose, advancedAt, amount);
+
+    public void UpdateBasicInfo(string purpose, Money amount)
+    {
+        ValidatePurposeAndAmount(purpose, amount);
+
+        if (Amount != amount && _settlementRecords.Any(x => !x.IsVoided))
+        {
+            throw new DomainRuleViolationException("已有已計入核對的結清紀錄時，不可修改預支金額。請先將相關結清紀錄標記為不採用後再修改。");
+        }
+
+        Purpose = purpose.Trim();
+        Amount = amount;
+    }
 
     public CashAdvanceSettlementRecord AddSettlementRecord(
         CashAdvanceSettlementType settlementType,
@@ -89,6 +99,19 @@ public sealed class CashAdvance
     {
         var record = GetSettlementRecord(settlementRecordId);
         record.MarkAsVoided(voidedBy, voidReason);
+    }
+
+    private static void ValidatePurposeAndAmount(string purpose, Money amount)
+    {
+        if (string.IsNullOrWhiteSpace(purpose))
+        {
+            throw new DomainRuleViolationException("預支用途不可空白。");
+        }
+
+        if (amount.Amount <= 0m)
+        {
+            throw new DomainRuleViolationException("預支金額必須大於 0。");
+        }
     }
 
     private CashAdvanceSettlementRecord GetSettlementRecord(Guid settlementRecordId)

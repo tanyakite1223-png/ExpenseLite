@@ -27,6 +27,9 @@
     <div class="text-end">
         <div class="badge bg-secondary mb-2">@ReconciliationText(Model.CashAdvance.ReconciliationStatus)</div>
         <div class="fs-4">@Model.CashAdvance.Amount.ToString("N2")</div>
+        <a class="btn btn-sm btn-outline-secondary mt-2"
+           asp-action="Edit"
+           asp-route-id="@Model.CashAdvance.Id">修改預支款</a>
     </div>
 </div>
 

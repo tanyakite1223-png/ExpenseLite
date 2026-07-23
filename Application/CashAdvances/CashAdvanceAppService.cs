@@ -80,6 +80,24 @@ public sealed class CashAdvanceAppService
         return cashAdvance.Id;
     }
 
+    public async Task UpdateAsync(
+        UpdateCashAdvanceCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var cashAdvance = await GetExistingCashAdvanceAsync(command.CashAdvanceId, cancellationToken);
+        var amount = Money.From(command.Amount);
+
+        if (cashAdvance.Amount != amount &&
+            await HasExpenseReportReferencesAsync(cashAdvance.Id, cancellationToken))
+        {
+            throw new DomainRuleViolationException("已有報銷單使用這筆預支款時，不可修改預支金額。");
+        }
+
+        cashAdvance.UpdateBasicInfo(command.Purpose, amount);
+
+        await _cashAdvances.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<CashAdvanceSettlementDetailDto?> GetDetailsAsync(
         Guid id,
         CancellationToken cancellationToken = default)
@@ -92,11 +110,13 @@ public sealed class CashAdvanceAppService
 
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
         var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
+        var relatedCashAdvanceIds = await GetRelatedCashAdvanceIdsAsync(cancellationToken);
 
         return MapSettlementDetail(
             cashAdvance,
             approvedAmounts.GetValueOrDefault(cashAdvance.Id),
-            inProgressCashAdvanceIds.Contains(cashAdvance.Id));
+            inProgressCashAdvanceIds.Contains(cashAdvance.Id),
+            relatedCashAdvanceIds.Contains(cashAdvance.Id));
     }
 
     public async Task RecordSettlementAsync(
@@ -269,6 +289,30 @@ public sealed class CashAdvanceAppService
             .ToHashSet();
     }
 
+    private async Task<HashSet<Guid>> GetRelatedCashAdvanceIdsAsync(
+        CancellationToken cancellationToken)
+    {
+        var reports = await _reports.ListAsync(cancellationToken);
+
+        return reports
+            .Where(x =>
+                x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+                x.CashAdvanceId is not null)
+            .Select(x => x.CashAdvanceId!.Value)
+            .ToHashSet();
+    }
+
+    private async Task<bool> HasExpenseReportReferencesAsync(
+        Guid cashAdvanceId,
+        CancellationToken cancellationToken)
+    {
+        var reports = await _reports.ListAsync(cancellationToken);
+
+        return reports.Any(x =>
+            x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+            x.CashAdvanceId == cashAdvanceId);
+    }
+
     private async Task<(int TotalCashAdvanceCount, IReadOnlyList<CashAdvanceListItemDto> Items)> BuildListItemsAsync(
         CancellationToken cancellationToken)
     {
@@ -326,9 +370,11 @@ public sealed class CashAdvanceAppService
     private static CashAdvanceSettlementDetailDto MapSettlementDetail(
         CashAdvance cashAdvance,
         decimal approvedReimbursedAmount,
-        bool hasInProgressReports)
+        bool hasInProgressReports,
+        bool hasRelatedReports)
     {
         var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
+        var hasAdoptedSettlementRecords = cashAdvance.SettlementRecords.Any(x => !x.IsVoided);
 
         return new CashAdvanceSettlementDetailDto(
             cashAdvance.Id,
@@ -343,6 +389,8 @@ public sealed class CashAdvanceAppService
             settlement.RemainingSettlementAmount,
             settlement.RequiredSettlementType,
             hasInProgressReports,
+            hasRelatedReports,
+            !hasRelatedReports && !hasAdoptedSettlementRecords,
             settlement.ReconciliationStatus,
             cashAdvance.SettlementRecords
                 .OrderByDescending(x => x.SettledAt)

@@ -57,6 +57,8 @@ public sealed record CashAdvanceSettlementDetailDto(
     decimal RemainingSettlementAmount,
     CashAdvanceSettlementType? RequiredSettlementType,
     bool HasInProgressReports,
+    bool HasRelatedReports,
+    bool CanEditAmount,
     CashAdvanceReconciliationStatus ReconciliationStatus,
     IReadOnlyList<CashAdvanceSettlementRecordDto> SettlementRecords);
 

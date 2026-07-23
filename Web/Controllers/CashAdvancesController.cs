@@ -46,6 +46,20 @@ public sealed class CashAdvancesController : Controller
         return View(page);
     }
 
+    public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
+    {
+        var page = await BuildEditCashAdvancePageAsync(
+            id,
+            null,
+            cancellationToken);
+        if (page is null)
+        {
+            return NotFound();
+        }
+
+        return View(page);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(
@@ -73,6 +87,59 @@ public sealed class CashAdvancesController : Controller
         {
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(form);
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(
+        Guid id,
+        [Bind(Prefix = "CashAdvanceForm")]
+        EditCashAdvanceForm form,
+        CancellationToken cancellationToken)
+    {
+        form.CashAdvanceId = id;
+
+        if (!ModelState.IsValid)
+        {
+            var page = await BuildEditCashAdvancePageAsync(
+                id,
+                form,
+                cancellationToken);
+            if (page is null)
+            {
+                return NotFound();
+            }
+
+            return View(page);
+        }
+
+        try
+        {
+            await _cashAdvances.UpdateAsync(
+                new UpdateCashAdvanceCommand(
+                    id,
+                    form.Purpose,
+                    form.Amount),
+                cancellationToken);
+
+            TempData["SuccessMessage"] = "預支款已修改。";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+
+            var page = await BuildEditCashAdvancePageAsync(
+                id,
+                form,
+                cancellationToken);
+            if (page is null)
+            {
+                return NotFound();
+            }
+
+            return View(page);
         }
     }
 
@@ -321,6 +388,31 @@ public sealed class CashAdvancesController : Controller
         {
             CashAdvance = cashAdvance,
             Settlement = form
+        };
+    }
+
+    private async Task<EditCashAdvancePage?> BuildEditCashAdvancePageAsync(
+        Guid id,
+        EditCashAdvanceForm? form,
+        CancellationToken cancellationToken)
+    {
+        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, cancellationToken);
+        if (cashAdvance is null)
+        {
+            return null;
+        }
+
+        form ??= new EditCashAdvanceForm
+        {
+            Purpose = cashAdvance.Purpose,
+            Amount = cashAdvance.Amount
+        };
+        form.CashAdvanceId = id;
+
+        return new EditCashAdvancePage
+        {
+            CashAdvance = cashAdvance,
+            CashAdvanceForm = form
         };
     }
 
