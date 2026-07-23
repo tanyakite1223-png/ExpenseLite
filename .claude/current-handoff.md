@@ -29,7 +29,7 @@
     - `/CashAdvances/Edit/bcf283d7-1c3b-4892-95d6-d2f9a6ea3f6d` 回 200。
     - 對已有報銷單引用的預支款 POST 修改金額會被擋下，頁面顯示「已有報銷單使用這筆預支款時，不可修改預支金額。」。
   - `git diff --check` 無 whitespace error；只有 Windows LF/CRLF 提醒。
-  - smoke test 後曾停止 dev server；最後為 Amber 實測重新啟動於 `http://localhost:5080`，PID `26260`。
+  - smoke test 後曾為 Amber 實測啟動 dev server；Amber 實測正常後已停止。
 
 ## 前一段結清功能狀態
 
@@ -142,7 +142,7 @@
   - `dotnet build` 成功。
   - 桌機本機 DB 已套用最新 migration `20260722145229_AddCashAdvanceSettlementRecordVoiding`。
   - 本機連線字串透過 user secrets 設定，不寫入 repo。
-  - dev server 目前為 Amber 實測已啟動於 `http://localhost:5080`，PID `26260`；重新 `dotnet build` 前若遇到鎖檔，先停掉該 process。
+  - dev server 目前已停止；`netstat -ano | findstr :5080` 無 LISTENING，只可能短暫看到 TIME_WAIT。
 
 ## 架構狀態
 
@@ -225,8 +225,9 @@
 ## 待 Amber 決定 / 待辦
 
 - 本段收尾：
-  - Amber 可實測預支款修改：剛新增且未被報銷單使用的預支款可改用途與金額；已被報銷單引用或已有已計入核對結清紀錄者只能改用途。
-  - 若確認可收尾，下一步適合 commit / push 本次預支款修改功能。
+  - 預支款修改功能已完成 commit / push，Amber 實測正常。
+  - 下一個 session 優先討論：「預支款已結清」後，是否仍需要保留修改功能。
+  - 若保留，需要一起定義已結清後哪些欄位不可修改；初步待討論欄位包含預支款本身的用途 / 預支金額，以及結清紀錄明細的結清日期 / 結清金額 / 處理人 / 備註。
 - 應用面下一步建議：
   - 可補「附件或發票照片上傳」，但會牽涉檔案儲存、安全性與大小限制。
   - 可另開「已核准報銷單更正 / 取消核准」流程，用來處理已核准後才發現選錯預支款、報銷單不成立、或需要從預支款核對中排除的情境。
@@ -239,25 +240,14 @@
 ## git 狀態
 
 - 已存在的最新 commit：
-  - `6dc4191 feat: 新增預支款結清紀錄修改與不採用`
+  - `01a4206 feat: 新增預支款修改功能`
 - push 狀態：
-  - `6dc4191` 已在 `origin/main`。
-  - 本次開始前 `git status --short --branch` 顯示 `## main...origin/main`。
+  - `01a4206` 已在 `origin/main`。
+  - commit / push 後 `git status --short --branch` 顯示 `## main...origin/main`。
 - 目前有未 commit 變更：
-  - `Application/CashAdvances/CashAdvanceAppService.cs`
-  - `Application/CashAdvances/CashAdvanceCommands.cs`
-  - `Application/CashAdvances/CashAdvanceDtos.cs`
-  - `Domain/CashAdvances/CashAdvance.cs`
-  - `Web/Controllers/CashAdvancesController.cs`
-  - `Web/ViewModels/CashAdvances/EditCashAdvanceForm.cs`
-  - `Web/ViewModels/CashAdvances/EditCashAdvancePage.cs`
-  - `Web/Views/CashAdvances/Details.cshtml`
-  - `Web/Views/CashAdvances/Edit.cshtml`
-  - `Web/Views/CashAdvances/Index.cshtml`
-  - `docs/architecture/cash-advance-reconciliation.md`
-  - `.claude/current-handoff.md`
+  - `.claude/current-handoff.md`：記錄 Amber 實測正常、dev server 已停止、下個 session 優先討論「預支款已結清後是否保留修改功能」。
 - 本次 handoff：
-  - 本檔已更新為目前可接續的未 commit 狀態。
+  - 本檔已更新為目前可接續狀態；此 handoff 補充尚未 commit / push。
 - 建議 commit message：
-  - `feat: 新增預支款修改功能`
+  - `docs: 更新預支款修改 handoff`
 - 後續若要 git add / commit / push，仍需依 CLAUDE.md 規定先列出指令、範圍與 commit message，取得 Amber 明確確認後才能執行。
