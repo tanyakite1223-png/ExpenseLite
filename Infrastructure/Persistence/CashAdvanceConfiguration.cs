@@ -91,6 +91,26 @@ public sealed class CashAdvanceConfiguration : IEntityTypeConfiguration<CashAdva
                 .HasMaxLength(500)
                 .IsRequired();
 
+            settlement.Property(x => x.IsVoided)
+                .HasColumnName("is_voided")
+                .IsRequired();
+
+            settlement.Property(x => x.VoidedBy)
+                .HasColumnName("voided_by")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            settlement.Property(x => x.VoidReason)
+                .HasColumnName("void_reason")
+                .HasMaxLength(500)
+                .IsRequired();
+
+            settlement.Property(x => x.VoidedAt)
+                .HasColumnName("voided_at");
+
+            settlement.Property(x => x.UpdatedAt)
+                .HasColumnName("updated_at");
+
             settlement.Property(x => x.CreatedAt)
                 .HasColumnName("created_at")
                 .IsRequired();

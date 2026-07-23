@@ -92,12 +92,18 @@ else
                     <td>@SettlementTypeText(cashAdvance.RequiredSettlementType)</td>
                     <td class="text-end">@cashAdvance.SettledAmount.ToString("N2")</td>
                     <td class="text-end">@cashAdvance.RemainingSettlementAmount.ToString("N2")</td>
-                    <td>@ReconciliationText(cashAdvance)</td>
+                    <td>
+                        <div>@ReconciliationText(cashAdvance)</div>
+                        @if (cashAdvance.HasInProgressReports)
+                        {
+                            <div class="text-warning small">仍有流程中報銷單</div>
+                        }
+                    </td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-primary"
                            asp-action="Details"
                            asp-route-id="@cashAdvance.Id">
-                            @(cashAdvance.RemainingSettlementAmount > 0m ? "記錄結清" : "查看")
+                            @ActionText(cashAdvance)
                         </a>
                     </td>
                 </tr>
@@ -126,6 +132,16 @@ else
             null => "-",
             _ => settlementType.ToString() ?? "-"
         };
+
+    private static string ActionText(CashAdvanceListItemDto cashAdvance)
+    {
+        if (cashAdvance.HasInProgressReports)
+        {
+            return "查看暫估";
+        }
+
+        return cashAdvance.RemainingSettlementAmount > 0m ? "記錄結清" : "查看";
+    }
 
     private static bool HasFilter(CashAdvanceListPageDto page)
         => !string.IsNullOrWhiteSpace(page.Keyword) ||

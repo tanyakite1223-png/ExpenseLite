@@ -22,6 +22,7 @@ public sealed record CashAdvanceListItemDto(
     decimal SettledAmount,
     decimal RemainingSettlementAmount,
     CashAdvanceSettlementType? RequiredSettlementType,
+    bool HasInProgressReports,
     bool IsSettled,
     CashAdvanceReconciliationStatus ReconciliationStatus);
 
@@ -55,6 +56,7 @@ public sealed record CashAdvanceSettlementDetailDto(
     decimal SettledAmount,
     decimal RemainingSettlementAmount,
     CashAdvanceSettlementType? RequiredSettlementType,
+    bool HasInProgressReports,
     CashAdvanceReconciliationStatus ReconciliationStatus,
     IReadOnlyList<CashAdvanceSettlementRecordDto> SettlementRecords);
 
@@ -65,4 +67,11 @@ public sealed record CashAdvanceSettlementRecordDto(
     decimal Amount,
     string HandledBy,
     string Note,
-    DateTimeOffset CreatedAt);
+    bool IsVoided,
+    string VoidedBy,
+    string VoidReason,
+    DateTimeOffset? VoidedAt,
+    DateTimeOffset? UpdatedAt,
+    DateTimeOffset CreatedAt,
+    bool CanEdit,
+    bool CanVoid);

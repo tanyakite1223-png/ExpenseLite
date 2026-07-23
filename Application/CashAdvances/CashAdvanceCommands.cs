@@ -12,3 +12,17 @@ public sealed record RecordCashAdvanceSettlementCommand(
     decimal Amount,
     string HandledBy,
     string? Note);
+
+public sealed record UpdateCashAdvanceSettlementCommand(
+    Guid CashAdvanceId,
+    Guid SettlementRecordId,
+    DateOnly SettledAt,
+    decimal Amount,
+    string HandledBy,
+    string? Note);
+
+public sealed record VoidCashAdvanceSettlementCommand(
+    Guid CashAdvanceId,
+    Guid SettlementRecordId,
+    string VoidedBy,
+    string? VoidReason);

@@ -57,6 +57,13 @@
     </table>
 </div>
 
+@if (Model.CashAdvance.HasInProgressReports)
+{
+    <div class="alert alert-warning">
+        這筆預支款仍有流程中的報銷單，目前核對金額只是暫估；請等相關報銷單核准或拒絕後再做最終結清。
+    </div>
+}
+
 <div class="row g-4">
     <div class="col-lg-7">
         <h2 class="h5 mb-3">結清紀錄</h2>
@@ -75,18 +82,60 @@
                             <th>方向</th>
                             <th class="text-end">金額</th>
                             <th>處理人</th>
+                            <th>狀態</th>
                             <th>備註</th>
+                            <th class="text-end">操作</th>
                         </tr>
                     </thead>
                     <tbody>
                     @foreach (var record in Model.CashAdvance.SettlementRecords)
                     {
-                        <tr>
+                        <tr class="@SettlementRecordRowClass(record)">
                             <td>@record.SettledAt.ToString("yyyy/MM/dd")</td>
                             <td>@SettlementTypeText(record.SettlementType)</td>
                             <td class="text-end">@record.Amount.ToString("N2")</td>
                             <td>@record.HandledBy</td>
-                            <td>@DisplayNote(record.Note)</td>
+                            <td>@SettlementRecordStatusText(record)</td>
+                            <td>
+                                <div>@DisplayNote(record.Note)</div>
+                                @if (record.UpdatedAt is not null)
+                                {
+                                    <div class="text-muted small">最後修改：@record.UpdatedAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</div>
+                                }
+                                @if (record.IsVoided)
+                                {
+                                    <div class="text-muted small">
+                                        不採用：@record.VoidedBy，
+                                        @DisplayDateTime(record.VoidedAt)，
+                                        @record.VoidReason
+                                    </div>
+                                }
+                            </td>
+                            <td class="text-end">
+                                @if (record.CanEdit || record.CanVoid)
+                                {
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="結清紀錄操作">
+                                        @if (record.CanEdit)
+                                        {
+                                            <a class="btn btn-outline-secondary"
+                                               asp-action="EditSettlement"
+                                               asp-route-id="@Model.CashAdvance.Id"
+                                               asp-route-settlementRecordId="@record.Id">修改</a>
+                                        }
+                                        @if (record.CanVoid)
+                                        {
+                                            <a class="btn btn-outline-danger"
+                                               asp-action="VoidSettlement"
+                                               asp-route-id="@Model.CashAdvance.Id"
+                                               asp-route-settlementRecordId="@record.Id">不採用</a>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
+                            </td>
                         </tr>
                     }
                     </tbody>
@@ -96,7 +145,11 @@
     </div>
 
     <div class="col-lg-5">
-        @if (Model.CashAdvance.RemainingSettlementAmount > 0m)
+        @if (Model.CashAdvance.HasInProgressReports)
+        {
+            <div class="alert alert-warning">仍有報銷單在流程中，暫不開放新增最終結清紀錄。</div>
+        }
+        else if (Model.CashAdvance.RemainingSettlementAmount > 0m)
         {
             <h2 class="h5 mb-3">新增結清紀錄</h2>
             <form asp-action="RecordSettlement" asp-route-id="@Model.CashAdvance.Id" method="post">
@@ -171,4 +224,13 @@
 
     private static string DisplayNote(string note)
         => string.IsNullOrWhiteSpace(note) ? "-" : note;
+
+    private static string SettlementRecordStatusText(CashAdvanceSettlementRecordDto record)
+        => record.IsVoided ? "不採用" : "已計入核對";
+
+    private static string SettlementRecordRowClass(CashAdvanceSettlementRecordDto record)
+        => record.IsVoided ? "table-secondary text-muted" : string.Empty;
+
+    private static string DisplayDateTime(DateTimeOffset? value)
+        => value is null ? "-" : value.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
 }

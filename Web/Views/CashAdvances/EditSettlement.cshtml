@@ -1,0 +1,80 @@
+@model EditCashAdvanceSettlementPage
+
+@{
+    ViewData["Title"] = "修改結清紀錄";
+}
+
+<div class="mb-3">
+    <a asp-action="Details" asp-route-id="@Model.CashAdvance.Id">返回預支款詳情</a>
+</div>
+
+<h1 class="h3 mb-3">修改結清紀錄</h1>
+
+<div class="table-responsive mb-4">
+    <table class="table table-sm align-middle">
+        <tbody>
+            <tr>
+                <th class="w-25">領款人</th>
+                <td>@Model.CashAdvance.PayeeName</td>
+            </tr>
+            <tr>
+                <th>用途</th>
+                <td>@Model.CashAdvance.Purpose</td>
+            </tr>
+            <tr>
+                <th>結清方向</th>
+                <td>@SettlementTypeText(Model.SettlementRecord.SettlementType)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<form asp-action="EditSettlement"
+      asp-route-id="@Model.CashAdvance.Id"
+      asp-route-settlementRecordId="@Model.SettlementRecord.Id"
+      method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    <input asp-for="Settlement.CashAdvanceId" type="hidden" />
+    <input asp-for="Settlement.SettlementRecordId" type="hidden" />
+
+    <div class="mb-3">
+        <label asp-for="Settlement.SettledAt" class="form-label">結清日期</label>
+        <input asp-for="Settlement.SettledAt" type="date" class="form-control" />
+        <span asp-validation-for="Settlement.SettledAt" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Settlement.Amount" class="form-label">結清金額</label>
+        <input asp-for="Settlement.Amount" class="form-control" inputmode="decimal" />
+        <span asp-validation-for="Settlement.Amount" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Settlement.HandledBy" class="form-label">處理人</label>
+        <input asp-for="Settlement.HandledBy" class="form-control" autocomplete="off" />
+        <span asp-validation-for="Settlement.HandledBy" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Settlement.Note" class="form-label">備註</label>
+        <textarea asp-for="Settlement.Note" class="form-control" rows="4"></textarea>
+        <span asp-validation-for="Settlement.Note" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">儲存修改</button>
+    <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.CashAdvance.Id">取消</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+@functions {
+    private static string SettlementTypeText(CashAdvanceSettlementType settlementType)
+        => settlementType switch
+        {
+            CashAdvanceSettlementType.CompanyPaid => "公司補付",
+            CashAdvanceSettlementType.EmployeeReturned => "員工繳回",
+            _ => settlementType.ToString()
+        };
+}

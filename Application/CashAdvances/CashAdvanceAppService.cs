@@ -91,10 +91,12 @@ public sealed class CashAdvanceAppService
         }
 
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
+        var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
 
         return MapSettlementDetail(
             cashAdvance,
-            approvedAmounts.GetValueOrDefault(cashAdvance.Id));
+            approvedAmounts.GetValueOrDefault(cashAdvance.Id),
+            inProgressCashAdvanceIds.Contains(cashAdvance.Id));
     }
 
     public async Task RecordSettlementAsync(
@@ -108,9 +110,15 @@ public sealed class CashAdvanceAppService
         }
 
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
+        var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
         var settlement = BuildSettlementSummary(
             cashAdvance,
             approvedAmounts.GetValueOrDefault(cashAdvance.Id));
+
+        if (inProgressCashAdvanceIds.Contains(cashAdvance.Id))
+        {
+            throw new DomainRuleViolationException("這筆預支款仍有流程中的報銷單，請等相關報銷單核准或拒絕後再做最終結清。");
+        }
 
         if (settlement.RequiredSettlementType is null ||
             settlement.RemainingSettlementAmount <= 0m)
@@ -133,6 +141,104 @@ public sealed class CashAdvanceAppService
         await _cashAdvances.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateSettlementAsync(
+        UpdateCashAdvanceSettlementCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var cashAdvance = await GetExistingCashAdvanceAsync(command.CashAdvanceId, cancellationToken);
+        var record = GetExistingSettlementRecord(cashAdvance, command.SettlementRecordId);
+
+        EnsureSettlementUpdateAmountIsAllowed(
+            cashAdvance,
+            record,
+            command.Amount,
+            await GetApprovedAmountAsync(cashAdvance.Id, cancellationToken));
+
+        cashAdvance.UpdateSettlementRecord(
+            command.SettlementRecordId,
+            command.SettledAt,
+            Money.From(command.Amount),
+            command.HandledBy,
+            command.Note);
+
+        await _cashAdvances.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task VoidSettlementAsync(
+        VoidCashAdvanceSettlementCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var cashAdvance = await GetExistingCashAdvanceAsync(command.CashAdvanceId, cancellationToken);
+
+        cashAdvance.VoidSettlementRecord(
+            command.SettlementRecordId,
+            command.VoidedBy,
+            command.VoidReason);
+
+        await _cashAdvances.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<CashAdvance> GetExistingCashAdvanceAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var cashAdvance = await _cashAdvances.GetByIdAsync(id, cancellationToken);
+        if (cashAdvance is null)
+        {
+            throw new DomainRuleViolationException("找不到預支款。");
+        }
+
+        return cashAdvance;
+    }
+
+    private static CashAdvanceSettlementRecord GetExistingSettlementRecord(
+        CashAdvance cashAdvance,
+        Guid settlementRecordId)
+    {
+        var record = cashAdvance.SettlementRecords.SingleOrDefault(x => x.Id == settlementRecordId);
+        if (record is null)
+        {
+            throw new DomainRuleViolationException("找不到結清紀錄。");
+        }
+
+        return record;
+    }
+
+    private async Task<decimal> GetApprovedAmountAsync(
+        Guid cashAdvanceId,
+        CancellationToken cancellationToken)
+    {
+        var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
+        return approvedAmounts.GetValueOrDefault(cashAdvanceId);
+    }
+
+    private static void EnsureSettlementUpdateAmountIsAllowed(
+        CashAdvance cashAdvance,
+        CashAdvanceSettlementRecord record,
+        decimal newAmount,
+        decimal approvedReimbursedAmount)
+    {
+        if (record.IsVoided)
+        {
+            return;
+        }
+
+        var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
+
+        if (settlement.RequiredSettlementType is null ||
+            record.SettlementType != settlement.RequiredSettlementType.Value)
+        {
+            throw new DomainRuleViolationException("這筆結清紀錄的方向已不符合目前應結清方向，請先標記為不採用後再重新結清。");
+        }
+
+        var currentContribution = record.Amount.Amount;
+        var maxAllowedAmount = settlement.RemainingSettlementAmount + currentContribution;
+        if (newAmount > maxAllowedAmount)
+        {
+            throw new DomainRuleViolationException("結清金額不可超過尚待結清金額。");
+        }
+    }
+
     private async Task<Dictionary<Guid, decimal>> GetApprovedAmountsByCashAdvanceAsync(
         CancellationToken cancellationToken)
     {
@@ -149,16 +255,34 @@ public sealed class CashAdvanceAppService
                 x => x.Sum(report => report.TotalAmount.Amount));
     }
 
+    private async Task<HashSet<Guid>> GetInProgressCashAdvanceIdsAsync(
+        CancellationToken cancellationToken)
+    {
+        var reports = await _reports.ListAsync(cancellationToken);
+
+        return reports
+            .Where(x =>
+                x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+                x.CashAdvanceId is not null &&
+                IsInProgress(x.Status))
+            .Select(x => x.CashAdvanceId!.Value)
+            .ToHashSet();
+    }
+
     private async Task<(int TotalCashAdvanceCount, IReadOnlyList<CashAdvanceListItemDto> Items)> BuildListItemsAsync(
         CancellationToken cancellationToken)
     {
         var cashAdvances = await _cashAdvances.ListAsync(cancellationToken);
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
+        var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
 
         var items = cashAdvances
             .OrderByDescending(x => x.AdvancedAt)
             .ThenByDescending(x => x.CreatedAt)
-            .Select(x => MapListItem(x, approvedAmounts.GetValueOrDefault(x.Id)))
+            .Select(x => MapListItem(
+                x,
+                approvedAmounts.GetValueOrDefault(x.Id),
+                inProgressCashAdvanceIds.Contains(x.Id)))
             .ToList();
 
         return (cashAdvances.Count, items);
@@ -166,7 +290,8 @@ public sealed class CashAdvanceAppService
 
     private static CashAdvanceListItemDto MapListItem(
         CashAdvance cashAdvance,
-        decimal approvedReimbursedAmount)
+        decimal approvedReimbursedAmount,
+        bool hasInProgressReports)
     {
         var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
 
@@ -182,6 +307,7 @@ public sealed class CashAdvanceAppService
             settlement.SettledAmount,
             settlement.RemainingSettlementAmount,
             settlement.RequiredSettlementType,
+            hasInProgressReports,
             settlement.RemainingSettlementAmount == 0m,
             settlement.ReconciliationStatus);
     }
@@ -199,7 +325,8 @@ public sealed class CashAdvanceAppService
 
     private static CashAdvanceSettlementDetailDto MapSettlementDetail(
         CashAdvance cashAdvance,
-        decimal approvedReimbursedAmount)
+        decimal approvedReimbursedAmount,
+        bool hasInProgressReports)
     {
         var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
 
@@ -215,6 +342,7 @@ public sealed class CashAdvanceAppService
             settlement.SettledAmount,
             settlement.RemainingSettlementAmount,
             settlement.RequiredSettlementType,
+            hasInProgressReports,
             settlement.ReconciliationStatus,
             cashAdvance.SettlementRecords
                 .OrderByDescending(x => x.SettledAt)
@@ -225,14 +353,25 @@ public sealed class CashAdvanceAppService
 
     private static CashAdvanceSettlementRecordDto MapSettlementRecord(
         CashAdvanceSettlementRecord record)
-        => new(
+    {
+        var canChange = !record.IsVoided;
+
+        return new CashAdvanceSettlementRecordDto(
             record.Id,
             record.SettlementType,
             record.SettledAt,
             record.Amount.Amount,
             record.HandledBy,
             record.Note,
-            record.CreatedAt);
+            record.IsVoided,
+            record.VoidedBy,
+            record.VoidReason,
+            record.VoidedAt,
+            record.UpdatedAt,
+            record.CreatedAt,
+            canChange,
+            canChange);
+    }
 
     private static bool MatchesFilter(
         CashAdvanceListItemDto cashAdvance,
@@ -278,7 +417,7 @@ public sealed class CashAdvanceAppService
         var settledAmount = requiredSettlementType is null
             ? 0m
             : cashAdvance.SettlementRecords
-                .Where(x => x.SettlementType == requiredSettlementType.Value)
+                .Where(x => x.SettlementType == requiredSettlementType.Value && !x.IsVoided)
                 .Sum(x => x.Amount.Amount);
         var remainingSettlementAmount = Math.Max(
             0m,
@@ -322,6 +461,11 @@ public sealed class CashAdvanceAppService
 
     private static bool ContainsKeyword(string value, string keyword)
         => value.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsInProgress(ExpenseReportStatus status)
+        => status is ExpenseReportStatus.Draft or
+            ExpenseReportStatus.Submitted or
+            ExpenseReportStatus.Returned;
 
     private sealed record CashAdvanceSettlementSummary(
         decimal Difference,

@@ -1,0 +1,87 @@
+@model VoidCashAdvanceSettlementPage
+
+@{
+    ViewData["Title"] = "不採用此筆結清紀錄";
+}
+
+<div class="mb-3">
+    <a asp-action="Details" asp-route-id="@Model.CashAdvance.Id">返回預支款詳情</a>
+</div>
+
+<h1 class="h3 mb-3">不採用此筆結清紀錄</h1>
+
+<div class="alert alert-warning">
+    此動作只影響這筆結清紀錄，不影響預支款與報銷單。標記為不採用後，這筆紀錄不再計入已結清金額，但仍會保留在詳情頁歷史中。
+</div>
+
+<div class="table-responsive mb-4">
+    <table class="table table-sm align-middle">
+        <tbody>
+            <tr>
+                <th class="w-25">領款人</th>
+                <td>@Model.CashAdvance.PayeeName</td>
+            </tr>
+            <tr>
+                <th>用途</th>
+                <td>@Model.CashAdvance.Purpose</td>
+            </tr>
+            <tr>
+                <th>結清日期</th>
+                <td>@Model.SettlementRecord.SettledAt.ToString("yyyy/MM/dd")</td>
+            </tr>
+            <tr>
+                <th>方向 / 金額</th>
+                <td>@SettlementTypeText(Model.SettlementRecord.SettlementType) @Model.SettlementRecord.Amount.ToString("N2")</td>
+            </tr>
+            <tr>
+                <th>處理人</th>
+                <td>@Model.SettlementRecord.HandledBy</td>
+            </tr>
+            <tr>
+                <th>備註</th>
+                <td>@DisplayNote(Model.SettlementRecord.Note)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<form asp-action="VoidSettlement"
+      asp-route-id="@Model.CashAdvance.Id"
+      asp-route-settlementRecordId="@Model.SettlementRecord.Id"
+      method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    <input asp-for="Settlement.CashAdvanceId" type="hidden" />
+    <input asp-for="Settlement.SettlementRecordId" type="hidden" />
+
+    <div class="mb-3">
+        <label asp-for="Settlement.VoidedBy" class="form-label">處理人</label>
+        <input asp-for="Settlement.VoidedBy" class="form-control" autocomplete="off" />
+        <span asp-validation-for="Settlement.VoidedBy" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Settlement.VoidReason" class="form-label">不採用原因</label>
+        <textarea asp-for="Settlement.VoidReason" class="form-control" rows="4"></textarea>
+        <span asp-validation-for="Settlement.VoidReason" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-danger">確認不採用</button>
+    <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.CashAdvance.Id">取消</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+@functions {
+    private static string SettlementTypeText(CashAdvanceSettlementType settlementType)
+        => settlementType switch
+        {
+            CashAdvanceSettlementType.CompanyPaid => "公司補付",
+            CashAdvanceSettlementType.EmployeeReturned => "員工繳回",
+            _ => settlementType.ToString()
+        };
+
+    private static string DisplayNote(string note)
+        => string.IsNullOrWhiteSpace(note) ? "-" : note;
+}

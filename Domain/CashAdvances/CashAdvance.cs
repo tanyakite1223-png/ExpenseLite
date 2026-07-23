@@ -68,4 +68,37 @@ public sealed class CashAdvance
 
         return record;
     }
+
+    public CashAdvanceSettlementRecord UpdateSettlementRecord(
+        Guid settlementRecordId,
+        DateOnly settledAt,
+        Money amount,
+        string handledBy,
+        string? note)
+    {
+        var record = GetSettlementRecord(settlementRecordId);
+        record.Update(settledAt, amount, handledBy, note);
+
+        return record;
+    }
+
+    public void VoidSettlementRecord(
+        Guid settlementRecordId,
+        string voidedBy,
+        string? voidReason)
+    {
+        var record = GetSettlementRecord(settlementRecordId);
+        record.MarkAsVoided(voidedBy, voidReason);
+    }
+
+    private CashAdvanceSettlementRecord GetSettlementRecord(Guid settlementRecordId)
+    {
+        var record = _settlementRecords.SingleOrDefault(x => x.Id == settlementRecordId);
+        if (record is null)
+        {
+            throw new DomainRuleViolationException("找不到結清紀錄。");
+        }
+
+        return record;
+    }
 }
