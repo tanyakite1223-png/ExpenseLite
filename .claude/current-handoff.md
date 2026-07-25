@@ -210,20 +210,9 @@ aggregate 邊界紀律：
 
 ---
 
-## git 狀態
-
-- 最新 commit：`5df1b68 docs: 記錄 PostgreSQL 註冊為 Windows 服務`，已在 `origin/main`。
-- 前次 commit：`5cd9aaf docs: 更新預支款修改 handoff`、`01a4206 feat: 新增預支款修改功能`。
-- 目前未 commit 的變更：本檔整份重寫 + 舊版歸檔到 `.claude/handoff-archive/handoff-20260725-2014.md`。
-- 沒有任何程式碼變更；`postgresql.conf` 在 repo 之外，不會出現在 `git status`。
-- 建議 commit message：`docs: 整理 handoff 並歸檔舊版`
-- 後續若要 git add / commit / push，仍需依 CLAUDE.md §5 先列出指令、範圍與 commit message，取得 Amber 明確確認後才能執行。
-
----
-
 ## 本檔維護紀律
 
 - **每項資訊只有一個出處。** 不在多處重述同一件事——重複的地方遲早只更新其中一處，變成互相矛盾。
 - 需要交叉引用時，用「見〈某章節〉」指過去，不要複製內容。
 - 更新時先刪過期內容，再寫新內容；不要讓做完的待辦跟有效待辦並存。
-- 不放「當下瞬間狀態」（dev server 開著沒、port 有沒有在聽）——下次開工就過期了，該現查。
+- **不放「當下瞬間狀態」**：dev server 開著沒、port 有沒有在聽、最新 commit hash、有沒有未 commit 變更——這些下次開工就過期了，該現查（`git status` / `git log` / `Get-Service`）。本檔尤其不記錄自己的 commit hash，因為 commit 發生在寫檔之後，寫下去當下就是錯的。
