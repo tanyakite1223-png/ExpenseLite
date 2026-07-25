@@ -3,11 +3,40 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-07-23 — 預支款用途與金額修改（未 commit）
+> 最後更新：2026-07-25 — 開發環境變更：PostgreSQL 註冊為 Windows 服務
 
 ---
 
-## 本次 session 摘要
+## 2026-07-25 session：開發環境變更（無程式碼改動）
+
+- 本次 **沒有動任何應用程式程式碼**，只處理開發環境。repo 內檔案只有本 handoff 有變更。
+- 起因：
+  - 開啟 `/CashAdvances` 出現 `NpgsqlException: Failed to connect to 127.0.0.1:5432`。
+  - 查出 PostgreSQL 根本沒在跑，且沒有註冊成 Windows 服務（scoop 安裝預設不註冊）。
+  - postgres log 顯示 `database system was not properly shut down`，最後正常運作時間停在 2026-07-23 19:15，代表關機時 postgres 沒被正常停掉。
+  - 手動 `pg_ctl start` 後自動 crash recovery 成功，**資料沒有損失**。
+- 處理：把 PostgreSQL 註冊成 Windows 服務，避免再發生「忘記啟動 / 沒正常關閉」。
+  - 服務名稱：`postgresql-18`
+  - 啟動類型：`Automatic`（開機自動啟動、關機自動正常停止）
+  - 執行帳號：`LocalSystem`（已確認 data 目錄 ACL 中 `NT AUTHORITY\SYSTEM` 有 FullControl）
+  - 註冊指令（需系統管理員權限）：
+    `pg_ctl register -N postgresql-18 -D "C:\Users\Pinecone\scoop\persist\postgresql\data" -S auto`
+  - data path 刻意用 `scoop\persist` 真實路徑，不走 `current` junction，避免 scoop 更新 app 版本時資料路徑跟著飄。
+- 另外開啟 log 收集：
+  - `pg_ctl register` **沒有** `-l` 參數，服務模式下不設定的話 log 只會進 Windows 事件檢視器。
+  - 因此把 `postgresql.conf` 的 `logging_collector` 由 `off` 改為 `on`。
+  - log 位置：`C:\Users\Pinecone\scoop\persist\postgresql\data\log\postgresql-YYYY-MM-DD_HHmmss.log`，自動輪替。
+  - 注意：`postgresql.conf` 在 repo 之外（scoop persist），這個改動 **不會進 Git**，換機器要自己設定。
+- 驗證：
+  - `Get-Service postgresql-18` → `Running` / `Automatic`。
+  - 5432 已 LISTENING。
+  - 服務啟動 log 為 `database system was shut down at ...`，已不再出現 crash recovery。
+  - smoke test：`/CashAdvances` 回 200、`/ExpenseReports` 回 200。
+- 順手處理：
+  - session 開始時發現前次 dev server（`ExpenseLite.exe`）還在跑沒有終止，已停掉。
+  - 之後為了驗證重新啟動 dev server，目前仍在 5080 執行中；收工前記得停掉。
+
+## 前一段 session 摘要（預支款修改）
 
 - 上一段「預支款結清紀錄修改與不採用」已完成 commit / push：
   - 最新已推送 commit：`6dc4191 feat: 新增預支款結清紀錄修改與不採用`。
@@ -203,10 +232,19 @@
 ## 開發環境狀態
 
 - 開發 DB（桌機，scoop）：
-  - 來源：`scoop install postgresql`。
-  - binaries：`~\scoop\apps\postgresql\current\bin`。
-  - data directory：`~\scoop\apps\postgresql\current\data`（junction → `~\scoop\persist\postgresql\data`，專案外）。
+  - 來源：`scoop install postgresql`，版本 PostgreSQL 18.4。
+  - binaries：`~\scoop\apps\postgresql\current\bin`（`current` 是 junction → `~\scoop\apps\postgresql\18.4-2`）。
+  - data directory：`~\scoop\persist\postgresql\data`（專案外；`~\scoop\apps\postgresql\current\data` 是指向它的 junction）。
   - database：`expenselite_dev`；application user：`expenselite_app`。
+  - **已註冊為 Windows 服務 `postgresql-18`（2026-07-25）**：
+    - 啟動類型 `Automatic`，開機自動啟動，不用再手動 `pg_ctl start`。
+    - 執行帳號 `LocalSystem`。
+    - 服務執行檔路徑：`...\current\bin\pg_ctl.exe runservice -N "postgresql-18" -D "C:\Users\Pinecone\scoop\persist\postgresql\data" -w`。
+    - 查詢：`Get-Service postgresql-18`（不需 admin）。
+    - 手動啟停：`Start-Service postgresql-18` / `Stop-Service postgresql-18`（需要系統管理員權限的 PowerShell）。
+    - 還原註冊：`pg_ctl unregister -N postgresql-18`（需 admin）。
+  - 已知風險：服務的執行檔走 `current` junction。若日後 `scoop update postgresql` 升上 PG 19 這類大版本，新 binary 會對到舊的 18 資料目錄，服務會啟動失敗（log 會明講版本不符），屆時需要做資料的 major upgrade，不是資料損壞。
+  - 筆電尚未做同樣的服務註冊，需要時要在筆電另外執行一次。
 - repo 內本機資料：
   - `.localdb`、`.devtools.bak`、`.devdata.bak` 已在 `.gitignore` 忽略，不會進 Git。
   - 舊的 `.devtools.bak`、`.devdata.bak` 若確認 scoop 穩定，之後可由 Amber 決定是否刪除。
@@ -221,6 +259,8 @@
   - `git diff --check` 可能出現 LF/CRLF 提醒，目前是 Windows 換行格式提示，不是程式錯誤。
   - `dotnet run` 若由 Codex sandbox 啟動，可能因 repo 外 `NuGet.Config` 權限被擋；可改用 Amber 本機 PowerShell 或允許 Codex 在 sandbox 外啟動。
   - 若 dev server 還在跑，Windows 會鎖住 `bin\Debug\net10.0\ExpenseLite.exe`；重新 `dotnet build` 前需先停掉該 process。
+  - 若頁面出現 `Failed to connect to 127.0.0.1:5432`，先查 `Get-Service postgresql-18` 是否 Running，再看 `data\log\` 最新 log；這是 DB 沒起來，不是程式錯誤。
+  - 註冊 / 啟停服務需要系統管理員權限；一般 session 權限不足時會需要 UAC 確認。
 
 ## 待 Amber 決定 / 待辦
 
@@ -240,14 +280,13 @@
 ## git 狀態
 
 - 已存在的最新 commit：
-  - `01a4206 feat: 新增預支款修改功能`
+  - `5cd9aaf docs: 更新預支款修改 handoff`
+  - （前一版 handoff 的「git 狀態」寫成尚未 commit，實際已 commit 為 `5cd9aaf`，本次已校正。）
 - push 狀態：
-  - `01a4206` 已在 `origin/main`。
-  - commit / push 後 `git status --short --branch` 顯示 `## main...origin/main`。
+  - `5cd9aaf` 已在 `origin/main`，`git status --short --branch` 顯示 `## main...origin/main`。
 - 目前有未 commit 變更：
-  - `.claude/current-handoff.md`：記錄 Amber 實測正常、dev server 已停止、下個 session 優先討論「預支款已結清後是否保留修改功能」。
-- 本次 handoff：
-  - 本檔已更新為目前可接續狀態；此 handoff 補充尚未 commit / push。
+  - `.claude/current-handoff.md`：本次環境變更紀錄（PostgreSQL 註冊為 Windows 服務）。
+  - 沒有其他程式碼變更；`postgresql.conf` 在 repo 之外，不會出現在 `git status`。
 - 建議 commit message：
-  - `docs: 更新預支款修改 handoff`
+  - `docs: 記錄 PostgreSQL 註冊為 Windows 服務`
 - 後續若要 git add / commit / push，仍需依 CLAUDE.md 規定先列出指令、範圍與 commit message，取得 Amber 明確確認後才能執行。
