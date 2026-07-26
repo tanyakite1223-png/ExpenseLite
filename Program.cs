@@ -2,6 +2,8 @@ using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure;
+using ExpenseLite.Infrastructure.Identity;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -21,7 +23,26 @@ builder.Services.AddScoped<CashAdvanceAppService>();
 builder.Services.AddScoped<ProjectAppService>();
 builder.Services.AddExpenseLiteInfrastructure(builder.Configuration);
 
+// 全站預設都要登入才能看，例外要自己標 [AllowAnonymous]（登入頁、錯誤頁）。
+// 用「預設關起來」而不是逐個 controller 加 [Authorize]，可以避免以後新增頁面時忘了加而漏權限。
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
+
+// 登入 cookie 的導向路徑屬於 Web 層的路由決定，所以留在這裡而不是 Infrastructure。
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
+});
+
 var app = builder.Build();
+
+await IdentitySeeder.SeedAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -34,6 +55,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();

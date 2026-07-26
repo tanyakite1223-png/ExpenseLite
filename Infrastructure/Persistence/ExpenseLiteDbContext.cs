@@ -1,11 +1,15 @@
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.CashAdvances;
 using ExpenseLite.Domain.Projects;
+using ExpenseLite.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseLite.Infrastructure.Persistence;
 
-public sealed class ExpenseLiteDbContext : DbContext
+public sealed class ExpenseLiteDbContext
+    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public ExpenseLiteDbContext(DbContextOptions<ExpenseLiteDbContext> options)
         : base(options)
@@ -20,6 +24,11 @@ public sealed class ExpenseLiteDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // 先讓 Identity 建好它的預設模型，再套用本專案的設定。
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ExpenseLiteDbContext).Assembly);
+
+        IdentityModelConfiguration.Apply(modelBuilder);
     }
 }

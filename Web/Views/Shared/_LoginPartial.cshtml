@@ -1,0 +1,32 @@
+@using System.Security.Claims
+@using ExpenseLite.Application.Identity
+
+<ul class="navbar-nav">
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <li class="nav-item">
+            <span class="nav-link text-dark">
+                @User.GetDisplayName()
+                <span class="badge bg-secondary ms-1">@RoleText(User)</span>
+            </span>
+        </li>
+        <li class="nav-item">
+            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                <button type="submit" class="btn btn-link nav-link text-dark">登出</button>
+            </form>
+        </li>
+    }
+    else
+    {
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">登入</a>
+        </li>
+    }
+</ul>
+
+@functions {
+    private static string RoleText(ClaimsPrincipal user)
+        => user.IsManager()
+            ? ExpenseLiteRoles.GetDisplayName(ExpenseLiteRoles.Manager)
+            : ExpenseLiteRoles.GetDisplayName(ExpenseLiteRoles.Employee);
+}
