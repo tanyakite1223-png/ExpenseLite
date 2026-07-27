@@ -21,6 +21,37 @@
 
 因為 Domain 不認識 `ApplicationUser`，報銷單之類的 aggregate 要記「是誰做的」時，**只存 `Guid` 形式的 UserId**，不持有使用者物件。這跟 §4.4「跨 aggregate 一律用 ID 參照」是同一個規則：使用者是另一個獨立的東西，不該被抓進報銷單的邊界裡。
 
+## 「是誰做的」怎麼從登入者流進 Domain
+
+報銷單的申請人、審核人，預支款結清的處理人、不採用處理人，以前都是表單上手動打的字串。現在改成自動帶入登入者，資料的流向是：
+
+```
+ClaimsPrincipal（登入 cookie）
+  → Controller: User.ToCurrentUser()
+  → Command: CurrentUser（Application 層的小 record）
+  → Entity: report.Approve(reviewerUserId, reviewerName)
+```
+
+三個刻意的設計：
+
+**1. Application 只認識 `CurrentUser`，不認識 `ClaimsPrincipal`。**
+`CurrentUser(Guid UserId, string DisplayName)` 是 Application 自己的型別。Controller 負責把 cookie 裡的身分翻譯成它——這正好是 Controller 該做的事（接 HTTP、model binding），所以 Controller 仍然是薄的。反過來如果讓 Application Service 直接讀 `HttpContext`，Application 就綁死在 Web 上了。
+
+**2. 同時存 UserId 和姓名，而且姓名是「快照」。**
+每個地方都存兩個欄位，例如 `ApplicantUserId`（`Guid?`）和 `ApplicantName`（`string`）：
+
+- **UserId** 是給程式用的：之後要做「員工只看自己的報銷單」就是靠它比對。
+- **姓名** 是給人看的歷史紀錄，**寫進去之後不會再跟著使用者改名而變動**。王小明改名成王大明，三年前那張報銷單上該顯示的仍然是當時的「王小明」。
+
+如果只存 UserId、顯示時再去 join `users` 表，畫面會隨著人事異動而改寫歷史；如果只存姓名，程式就無法可靠地判斷「這是不是我的單」。所以兩個都要。
+
+UserId 是 nullable，因為導入登入機制之前建立的舊資料沒有帳號可以對應——這是「這筆資料早於登入功能」的誠實表達，不是可有可無。
+
+**3. 補回歷史紀錄的人名時，不要覆蓋原本的人。**
+`CashAdvanceSettlementRecord.Update()` 刻意**不接**處理人參數：處理人是當初登記這筆結清的人，之後別人來更正金額或備註都不會換掉它，理由同上——歷史不該被改寫。代價是「這次是誰改的」目前只有 `UpdatedAt` 時間、沒有名字；真的需要時再加 `UpdatedByUserId`。
+
+另外，預支款的**領款人（`PayeeName`）維持手動輸入**，因為它是「錢給了誰」，不是「誰在操作系統」——主管很可能替員工建立預支款。分辨「操作者」與「當事人」是這一段的重點：只有操作者才該自動帶入登入者。
+
 ## 資料表命名
 
 Identity 預設會建 `AspNetUsers`、`AspNetRoles` 這種 PascalCase 表名，本專案其他資料表都是 snake_case。`Infrastructure/Persistence/IdentityModelConfiguration.cs` 把它們改名成 `users`、`roles`、`user_roles` 等，欄位也轉成 snake_case，避免同一個資料庫出現兩套命名慣例（PostgreSQL 遇到 PascalCase 還得加引號才查得到）。
