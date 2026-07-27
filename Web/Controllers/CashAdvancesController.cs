@@ -1,4 +1,5 @@
 using ExpenseLite.Application.CashAdvances;
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.CashAdvances;
 using Microsoft.AspNetCore.Mvc;
@@ -175,7 +176,7 @@ public sealed class CashAdvancesController : Controller
                     id,
                     form.SettledAt,
                     form.Amount,
-                    form.HandledBy,
+                    User.ToCurrentUser(),
                     form.Note),
                 cancellationToken);
 
@@ -259,7 +260,6 @@ public sealed class CashAdvancesController : Controller
                     settlementRecordId,
                     form.SettledAt,
                     form.Amount,
-                    form.HandledBy,
                     form.Note),
                 cancellationToken);
 
@@ -341,7 +341,7 @@ public sealed class CashAdvancesController : Controller
                 new VoidCashAdvanceSettlementCommand(
                     id,
                     settlementRecordId,
-                    form.VoidedBy,
+                    User.ToCurrentUser(),
                     form.VoidReason),
                 cancellationToken);
 
@@ -433,7 +433,6 @@ public sealed class CashAdvancesController : Controller
         {
             SettledAt = record.SettledAt,
             Amount = record.Amount,
-            HandledBy = record.HandledBy,
             Note = record.Note
         };
         form.CashAdvanceId = id;

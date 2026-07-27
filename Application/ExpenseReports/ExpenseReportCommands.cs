@@ -1,10 +1,11 @@
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Domain.ExpenseReports;
 
 namespace ExpenseLite.Application.ExpenseReports;
 
 public sealed record CreateExpenseReportCommand(
     string Title,
-    string ApplicantName,
+    CurrentUser Applicant,
     ExpenseType ExpenseType,
     Guid? ProjectId,
     ExpensePaymentMethod PaymentMethod,
@@ -13,7 +14,6 @@ public sealed record CreateExpenseReportCommand(
 public sealed record UpdateExpenseReportCommand(
     Guid Id,
     string Title,
-    string ApplicantName,
     ExpenseType ExpenseType,
     Guid? ProjectId,
     ExpensePaymentMethod PaymentMethod,
@@ -40,5 +40,5 @@ public sealed record UpdateExpenseDetailCommand(
 
 public sealed record ReviewExpenseReportCommand(
     Guid ReportId,
-    string ReviewerName,
+    CurrentUser Reviewer,
     string? Reason);

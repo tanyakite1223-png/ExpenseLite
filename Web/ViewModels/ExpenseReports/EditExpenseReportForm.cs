@@ -13,8 +13,7 @@ public sealed class EditExpenseReportForm
     [StringLength(100, ErrorMessage = "標題最多 100 個字")]
     public string Title { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "請輸入申請人")]
-    [StringLength(50, ErrorMessage = "申請人最多 50 個字")]
+    /// <summary>只用來顯示，不會寫回報銷單——申請人是建立者，建立後就不再變動。</summary>
     public string ApplicantName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "請選擇支出類型")]

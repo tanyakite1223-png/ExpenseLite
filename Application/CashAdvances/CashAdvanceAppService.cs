@@ -155,7 +155,8 @@ public sealed class CashAdvanceAppService
             settlement.RequiredSettlementType.Value,
             command.SettledAt,
             Money.From(command.Amount),
-            command.HandledBy,
+            command.HandledBy.UserId,
+            command.HandledBy.DisplayName,
             command.Note);
 
         await _cashAdvances.SaveChangesAsync(cancellationToken);
@@ -178,7 +179,6 @@ public sealed class CashAdvanceAppService
             command.SettlementRecordId,
             command.SettledAt,
             Money.From(command.Amount),
-            command.HandledBy,
             command.Note);
 
         await _cashAdvances.SaveChangesAsync(cancellationToken);
@@ -192,7 +192,8 @@ public sealed class CashAdvanceAppService
 
         cashAdvance.VoidSettlementRecord(
             command.SettlementRecordId,
-            command.VoidedBy,
+            command.VoidedBy.UserId,
+            command.VoidedBy.DisplayName,
             command.VoidReason);
 
         await _cashAdvances.SaveChangesAsync(cancellationToken);

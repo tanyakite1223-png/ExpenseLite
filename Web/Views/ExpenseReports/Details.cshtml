@@ -266,9 +266,9 @@
                 @Html.AntiForgeryToken()
 
                 <div class="mb-3">
-                    <label asp-for="Review.ReviewerName" class="form-label">審核人</label>
-                    <input asp-for="Review.ReviewerName" name="ReviewerName" class="form-control" autocomplete="off" />
-                    <span asp-validation-for="Review.ReviewerName" class="text-danger"></span>
+                    <label class="form-label">審核人</label>
+                    <input class="form-control" value="@User.GetDisplayName()" readonly />
+                    <div class="form-text">審核人就是目前登入的人。</div>
                 </div>
 
                 <div class="mb-3">

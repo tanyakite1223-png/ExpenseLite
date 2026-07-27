@@ -19,15 +19,16 @@ public sealed class ExpenseReport
 
     private ExpenseReport(
         string title,
+        Guid applicantUserId,
         string applicantName,
         ExpenseType expenseType,
         Guid? projectId,
         ExpensePaymentMethod paymentMethod,
         Guid? cashAdvanceId)
     {
+        EnsureApplicantIsValid(applicantUserId, applicantName);
         EnsureBasicInfoIsValid(
             title,
-            applicantName,
             expenseType,
             projectId,
             paymentMethod,
@@ -35,6 +36,7 @@ public sealed class ExpenseReport
 
         Id = Guid.NewGuid();
         Title = title.Trim();
+        ApplicantUserId = applicantUserId;
         ApplicantName = applicantName.Trim();
         ExpenseType = expenseType;
         ProjectId = projectId;
@@ -49,6 +51,10 @@ public sealed class ExpenseReport
 
     public string Title { get; private set; }
 
+    /// <summary>申請人的登入帳號 Id。舊資料沒有登入者可對應，所以是 nullable。</summary>
+    public Guid? ApplicantUserId { get; private set; }
+
+    /// <summary>申請當下的姓名快照。使用者日後改名時，這裡刻意不跟著變。</summary>
     public string ApplicantName { get; private set; }
 
     public ExpenseReportStatus Status { get; private set; }
@@ -73,12 +79,13 @@ public sealed class ExpenseReport
 
     public static ExpenseReport Create(
         string title,
+        Guid applicantUserId,
         string applicantName,
         ExpenseType expenseType,
         Guid? projectId,
         ExpensePaymentMethod paymentMethod,
         Guid? cashAdvanceId)
-        => new(title, applicantName, expenseType, projectId, paymentMethod, cashAdvanceId);
+        => new(title, applicantUserId, applicantName, expenseType, projectId, paymentMethod, cashAdvanceId);
 
     public ExpenseDetail AddDetail(
         DateOnly expenseDate,
@@ -144,9 +151,9 @@ public sealed class ExpenseReport
         RecalculateTotal();
     }
 
+    /// <summary>申請人是建立報銷單的登入者，建立後就不再變動，所以不在修改範圍內。</summary>
     public void UpdateBasicInfo(
         string title,
-        string applicantName,
         ExpenseType expenseType,
         Guid? projectId,
         ExpensePaymentMethod paymentMethod,
@@ -155,14 +162,12 @@ public sealed class ExpenseReport
         EnsureEditable("只有草稿或退回的報銷單可以修改。");
         EnsureBasicInfoIsValid(
             title,
-            applicantName,
             expenseType,
             projectId,
             paymentMethod,
             cashAdvanceId);
 
         Title = title.Trim();
-        ApplicantName = applicantName.Trim();
         ExpenseType = expenseType;
         ProjectId = projectId;
         PaymentMethod = paymentMethod;
@@ -185,30 +190,42 @@ public sealed class ExpenseReport
         SubmittedAt = DateTimeOffset.UtcNow;
     }
 
-    public void Return(string reviewerName, string reason)
+    public void Return(Guid reviewerUserId, string reviewerName, string reason)
     {
         EnsureSubmitted("只有送審中的報銷單可以退回。");
         Status = ExpenseReportStatus.Returned;
-        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Returned, reviewerName, reason));
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Returned, reviewerUserId, reviewerName, reason));
     }
 
-    public void Approve(string reviewerName)
+    public void Approve(Guid reviewerUserId, string reviewerName)
     {
         EnsureSubmitted("只有送審中的報銷單可以核准。");
         Status = ExpenseReportStatus.Approved;
-        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Approved, reviewerName, null));
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Approved, reviewerUserId, reviewerName, null));
     }
 
-    public void Reject(string reviewerName, string reason)
+    public void Reject(Guid reviewerUserId, string reviewerName, string reason)
     {
         EnsureSubmitted("只有送審中的報銷單可以拒絕。");
         Status = ExpenseReportStatus.Rejected;
-        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Rejected, reviewerName, reason));
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Rejected, reviewerUserId, reviewerName, reason));
+    }
+
+    private static void EnsureApplicantIsValid(Guid applicantUserId, string applicantName)
+    {
+        if (applicantUserId == Guid.Empty)
+        {
+            throw new DomainRuleViolationException("申請人必須對應到一個登入帳號。");
+        }
+
+        if (string.IsNullOrWhiteSpace(applicantName))
+        {
+            throw new DomainRuleViolationException("申請人不可空白。");
+        }
     }
 
     private static void EnsureBasicInfoIsValid(
         string title,
-        string applicantName,
         ExpenseType expenseType,
         Guid? projectId,
         ExpensePaymentMethod paymentMethod,
@@ -217,11 +234,6 @@ public sealed class ExpenseReport
         if (string.IsNullOrWhiteSpace(title))
         {
             throw new DomainRuleViolationException("報銷單標題不可空白。");
-        }
-
-        if (string.IsNullOrWhiteSpace(applicantName))
-        {
-            throw new DomainRuleViolationException("申請人不可空白。");
         }
 
         if (expenseType == ExpenseType.Project && projectId is null)

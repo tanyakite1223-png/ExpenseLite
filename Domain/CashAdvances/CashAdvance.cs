@@ -65,14 +65,16 @@ public sealed class CashAdvance
         CashAdvanceSettlementType settlementType,
         DateOnly settledAt,
         Money amount,
-        string handledBy,
+        Guid handledByUserId,
+        string handledByName,
         string? note)
     {
         var record = new CashAdvanceSettlementRecord(
             settlementType,
             settledAt,
             amount,
-            handledBy,
+            handledByUserId,
+            handledByName,
             note);
         _settlementRecords.Add(record);
 
@@ -83,22 +85,22 @@ public sealed class CashAdvance
         Guid settlementRecordId,
         DateOnly settledAt,
         Money amount,
-        string handledBy,
         string? note)
     {
         var record = GetSettlementRecord(settlementRecordId);
-        record.Update(settledAt, amount, handledBy, note);
+        record.Update(settledAt, amount, note);
 
         return record;
     }
 
     public void VoidSettlementRecord(
         Guid settlementRecordId,
-        string voidedBy,
+        Guid voidedByUserId,
+        string voidedByName,
         string? voidReason)
     {
         var record = GetSettlementRecord(settlementRecordId);
-        record.MarkAsVoided(voidedBy, voidReason);
+        record.MarkAsVoided(voidedByUserId, voidedByName, voidReason);
     }
 
     private static void ValidatePurposeAndAmount(string purpose, Money amount)

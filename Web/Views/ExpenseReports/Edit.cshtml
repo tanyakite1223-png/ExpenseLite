@@ -21,9 +21,9 @@
     </div>
 
     <div class="mb-3">
-        <label asp-for="ApplicantName" class="form-label">申請人</label>
-        <input asp-for="ApplicantName" class="form-control" autocomplete="off" />
-        <span asp-validation-for="ApplicantName" class="text-danger"></span>
+        <label class="form-label">申請人</label>
+        <input class="form-control" value="@Model.ApplicantName" readonly />
+        <div class="form-text">申請人是建立這張報銷單的人，不可修改。</div>
     </div>
 
     <div class="mb-3">

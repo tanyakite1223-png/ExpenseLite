@@ -83,7 +83,8 @@ public sealed class ExpenseReportAppService
 
         var report = ExpenseReport.Create(
             command.Title,
-            command.ApplicantName,
+            command.Applicant.UserId,
+            command.Applicant.DisplayName,
             command.ExpenseType,
             command.ProjectId,
             command.PaymentMethod,
@@ -111,7 +112,6 @@ public sealed class ExpenseReportAppService
 
         report.UpdateBasicInfo(
             command.Title,
-            command.ApplicantName,
             command.ExpenseType,
             command.ProjectId,
             command.PaymentMethod,
@@ -175,7 +175,7 @@ public sealed class ExpenseReportAppService
     {
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
 
-        report.Return(command.ReviewerName, command.Reason ?? string.Empty);
+        report.Return(command.Reviewer.UserId, command.Reviewer.DisplayName, command.Reason ?? string.Empty);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }
@@ -184,7 +184,7 @@ public sealed class ExpenseReportAppService
     {
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
 
-        report.Approve(command.ReviewerName);
+        report.Approve(command.Reviewer.UserId, command.Reviewer.DisplayName);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }
@@ -193,7 +193,7 @@ public sealed class ExpenseReportAppService
     {
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
 
-        report.Reject(command.ReviewerName, command.Reason ?? string.Empty);
+        report.Reject(command.Reviewer.UserId, command.Reviewer.DisplayName, command.Reason ?? string.Empty);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }

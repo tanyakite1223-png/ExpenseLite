@@ -54,9 +54,9 @@
     <input asp-for="Settlement.SettlementRecordId" type="hidden" />
 
     <div class="mb-3">
-        <label asp-for="Settlement.VoidedBy" class="form-label">處理人</label>
-        <input asp-for="Settlement.VoidedBy" class="form-control" autocomplete="off" />
-        <span asp-validation-for="Settlement.VoidedBy" class="text-danger"></span>
+        <label class="form-label">不採用處理人</label>
+        <input class="form-control" value="@User.GetDisplayName()" readonly />
+        <div class="form-text">處理人就是目前登入的人。</div>
     </div>
 
     <div class="mb-3">

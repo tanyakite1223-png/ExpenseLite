@@ -81,6 +81,9 @@ public sealed class CashAdvanceConfiguration : IEntityTypeConfiguration<CashAdva
                     .IsRequired();
             });
 
+            settlement.Property(x => x.HandledByUserId)
+                .HasColumnName("handled_by_user_id");
+
             settlement.Property(x => x.HandledBy)
                 .HasColumnName("handled_by")
                 .HasMaxLength(50)
@@ -94,6 +97,9 @@ public sealed class CashAdvanceConfiguration : IEntityTypeConfiguration<CashAdva
             settlement.Property(x => x.IsVoided)
                 .HasColumnName("is_voided")
                 .IsRequired();
+
+            settlement.Property(x => x.VoidedByUserId)
+                .HasColumnName("voided_by_user_id");
 
             settlement.Property(x => x.VoidedBy)
                 .HasColumnName("voided_by")

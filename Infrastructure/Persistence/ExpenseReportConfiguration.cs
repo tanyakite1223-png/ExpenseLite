@@ -21,6 +21,10 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
             .HasMaxLength(100)
             .IsRequired();
 
+        // 舊資料沒有對應的登入帳號，所以 user id 欄位是 nullable；姓名欄位維持必填。
+        builder.Property(x => x.ApplicantUserId)
+            .HasColumnName("applicant_user_id");
+
         builder.Property(x => x.ApplicantName)
             .HasColumnName("applicant_name")
             .HasMaxLength(50)
@@ -137,6 +141,9 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .IsRequired();
+
+            review.Property(x => x.ReviewerUserId)
+                .HasColumnName("reviewer_user_id");
 
             review.Property(x => x.ReviewerName)
                 .HasColumnName("reviewer_name")

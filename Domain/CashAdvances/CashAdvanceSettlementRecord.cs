@@ -18,15 +18,18 @@ public sealed class CashAdvanceSettlementRecord
         CashAdvanceSettlementType settlementType,
         DateOnly settledAt,
         Money amount,
+        Guid handledByUserId,
         string handledBy,
         string? note)
     {
-        ValidateSettlementFields(settledAt, amount, handledBy);
+        ValidateSettlementFields(settledAt, amount);
+        ValidateHandler(handledByUserId, handledBy);
 
         Id = Guid.NewGuid();
         SettlementType = settlementType;
         SettledAt = settledAt;
         Amount = amount;
+        HandledByUserId = handledByUserId;
         HandledBy = handledBy.Trim();
         Note = note?.Trim() ?? string.Empty;
         VoidedBy = string.Empty;
@@ -42,11 +45,18 @@ public sealed class CashAdvanceSettlementRecord
 
     public Money Amount { get; private set; }
 
+    /// <summary>登記這筆結清的登入帳號 Id。舊資料沒有登入者可對應，所以是 nullable。</summary>
+    public Guid? HandledByUserId { get; private set; }
+
+    /// <summary>登記當下的姓名快照。使用者日後改名時，這裡刻意不跟著變。</summary>
     public string HandledBy { get; private set; }
 
     public string Note { get; private set; }
 
     public bool IsVoided { get; private set; }
+
+    /// <summary>標記不採用的登入帳號 Id。尚未不採用或舊資料時為 null。</summary>
+    public Guid? VoidedByUserId { get; private set; }
 
     public string VoidedBy { get; private set; }
 
@@ -58,10 +68,10 @@ public sealed class CashAdvanceSettlementRecord
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>處理人是當初登記這筆結清的人，之後別人來更正內容也不會改掉，避免歷史失真。</summary>
     internal void Update(
         DateOnly settledAt,
         Money amount,
-        string handledBy,
         string? note)
     {
         if (IsVoided)
@@ -69,26 +79,22 @@ public sealed class CashAdvanceSettlementRecord
             throw new DomainRuleViolationException("已標記為不採用的結清紀錄不可修改。");
         }
 
-        ValidateSettlementFields(settledAt, amount, handledBy);
+        ValidateSettlementFields(settledAt, amount);
 
         SettledAt = settledAt;
         Amount = amount;
-        HandledBy = handledBy.Trim();
         Note = note?.Trim() ?? string.Empty;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    internal void MarkAsVoided(string voidedBy, string? voidReason)
+    internal void MarkAsVoided(Guid voidedByUserId, string voidedBy, string? voidReason)
     {
         if (IsVoided)
         {
             throw new DomainRuleViolationException("結清紀錄已經標記為不採用。");
         }
 
-        if (string.IsNullOrWhiteSpace(voidedBy))
-        {
-            throw new DomainRuleViolationException("處理人不可空白。");
-        }
+        ValidateHandler(voidedByUserId, voidedBy);
 
         if (string.IsNullOrWhiteSpace(voidReason))
         {
@@ -96,12 +102,13 @@ public sealed class CashAdvanceSettlementRecord
         }
 
         IsVoided = true;
+        VoidedByUserId = voidedByUserId;
         VoidedBy = voidedBy.Trim();
         VoidReason = voidReason.Trim();
         VoidedAt = DateTimeOffset.UtcNow;
     }
 
-    private static void ValidateSettlementFields(DateOnly settledAt, Money amount, string handledBy)
+    private static void ValidateSettlementFields(DateOnly settledAt, Money amount)
     {
         if (settledAt == default)
         {
@@ -112,8 +119,16 @@ public sealed class CashAdvanceSettlementRecord
         {
             throw new DomainRuleViolationException("結清金額必須大於 0。");
         }
+    }
 
-        if (string.IsNullOrWhiteSpace(handledBy))
+    private static void ValidateHandler(Guid userId, string name)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new DomainRuleViolationException("處理人必須對應到一個登入帳號。");
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
         {
             throw new DomainRuleViolationException("處理人不可空白。");
         }

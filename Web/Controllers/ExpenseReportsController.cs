@@ -1,5 +1,6 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Shared;
@@ -57,7 +58,7 @@ public sealed class ExpenseReportsController : Controller
             var id = await _expenseReports.CreateAsync(
                 new CreateExpenseReportCommand(
                     form.Title,
-                    form.ApplicantName,
+                    User.ToCurrentUser(),
                     form.ExpenseType,
                     form.ProjectId,
                     form.PaymentMethod,
@@ -141,7 +142,6 @@ public sealed class ExpenseReportsController : Controller
                 new UpdateExpenseReportCommand(
                     id,
                     form.Title,
-                    form.ApplicantName,
                     form.ExpenseType,
                     form.ProjectId,
                     form.PaymentMethod,
@@ -294,7 +294,7 @@ public sealed class ExpenseReportsController : Controller
         try
         {
             await _expenseReports.ReturnAsync(
-                new ReviewExpenseReportCommand(id, form.ReviewerName, form.Reason),
+                new ReviewExpenseReportCommand(id, User.ToCurrentUser(), form.Reason),
                 cancellationToken);
             TempData["SuccessMessage"] = "報銷單已退回。";
         }
@@ -319,7 +319,7 @@ public sealed class ExpenseReportsController : Controller
         try
         {
             await _expenseReports.ApproveAsync(
-                new ReviewExpenseReportCommand(id, form.ReviewerName, form.Reason),
+                new ReviewExpenseReportCommand(id, User.ToCurrentUser(), form.Reason),
                 cancellationToken);
             TempData["SuccessMessage"] = "報銷單已核准。";
         }
@@ -344,7 +344,7 @@ public sealed class ExpenseReportsController : Controller
         try
         {
             await _expenseReports.RejectAsync(
-                new ReviewExpenseReportCommand(id, form.ReviewerName, form.Reason),
+                new ReviewExpenseReportCommand(id, User.ToCurrentUser(), form.Reason),
                 cancellationToken);
             TempData["SuccessMessage"] = "報銷單已拒絕。";
         }
@@ -371,6 +371,14 @@ public sealed class ExpenseReportsController : Controller
     {
         form.ProjectOptions = await _projects.ListActiveOptionsAsync(cancellationToken);
         form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
+
+        // 申請人在畫面上是唯讀文字、不會隨表單送回來，所以驗證失敗重新顯示時要自己補回去。
+        if (string.IsNullOrWhiteSpace(form.ApplicantName))
+        {
+            var report = await _expenseReports.GetDetailsAsync(form.Id, cancellationToken);
+            form.ApplicantName = report?.ApplicantName ?? string.Empty;
+        }
+
         return form;
     }
 

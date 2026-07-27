@@ -50,9 +50,9 @@
     </div>
 
     <div class="mb-3">
-        <label asp-for="Settlement.HandledBy" class="form-label">處理人</label>
-        <input asp-for="Settlement.HandledBy" class="form-control" autocomplete="off" />
-        <span asp-validation-for="Settlement.HandledBy" class="text-danger"></span>
+        <label class="form-label">處理人</label>
+        <input class="form-control" value="@Model.SettlementRecord.HandledBy" readonly />
+        <div class="form-text">處理人是當初登記這筆結清的人，修改內容不會改掉它。</div>
     </div>
 
     <div class="mb-3">
