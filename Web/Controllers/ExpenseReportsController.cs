@@ -5,6 +5,7 @@ using ExpenseLite.Application.Projects;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.ExpenseReports;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ExpenseLite.Web.Controllers;
@@ -105,6 +106,12 @@ public sealed class ExpenseReportsController : Controller
             return NotFound();
         }
 
+        // 真正的把關在 Application Service，這裡是為了讓非申請人連表單都看不到。
+        if (report.ApplicantUserId != User.GetUserId())
+        {
+            return Forbid();
+        }
+
         if (!CanEditReport(report.Status))
         {
             TempData["ErrorMessage"] = "只有草稿或退回的報銷單可以修改。";
@@ -141,6 +148,7 @@ public sealed class ExpenseReportsController : Controller
             await _expenseReports.UpdateAsync(
                 new UpdateExpenseReportCommand(
                     id,
+                    User.ToCurrentUser(),
                     form.Title,
                     form.ExpenseType,
                     form.ProjectId,
@@ -182,6 +190,7 @@ public sealed class ExpenseReportsController : Controller
             await _expenseReports.AddDetailAsync(
                 new AddExpenseDetailCommand(
                     id,
+                    User.ToCurrentUser(),
                     newDetail.ExpenseDate,
                     newDetail.Category,
                     newDetail.Description,
@@ -230,6 +239,7 @@ public sealed class ExpenseReportsController : Controller
                 new UpdateExpenseDetailCommand(
                     id,
                     detailId,
+                    User.ToCurrentUser(),
                     form.ExpenseDate,
                     form.Category,
                     form.Description,
@@ -254,7 +264,9 @@ public sealed class ExpenseReportsController : Controller
     {
         try
         {
-            await _expenseReports.RemoveDetailAsync(id, detailId, cancellationToken);
+            await _expenseReports.RemoveDetailAsync(
+                new RemoveExpenseDetailCommand(id, detailId, User.ToCurrentUser()),
+                cancellationToken);
         }
         catch (DomainRuleViolationException ex)
         {
@@ -270,7 +282,9 @@ public sealed class ExpenseReportsController : Controller
     {
         try
         {
-            await _expenseReports.SubmitAsync(id, cancellationToken);
+            await _expenseReports.SubmitAsync(
+                new SubmitExpenseReportCommand(id, User.ToCurrentUser()),
+                cancellationToken);
             TempData["SuccessMessage"] = "報銷單已送審。";
         }
         catch (DomainRuleViolationException ex)
@@ -281,8 +295,11 @@ public sealed class ExpenseReportsController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    // 核准 / 退回 / 拒絕是純角色檢查（「你是不是主管」），不需要載入報銷單就能判斷，
+    // 所以擋在 Controller 的 [Authorize] 而不是 Application Service。
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Return(Guid id, ReviewExpenseReportForm form, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
@@ -308,6 +325,7 @@ public sealed class ExpenseReportsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Approve(Guid id, ReviewExpenseReportForm form, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
@@ -333,6 +351,7 @@ public sealed class ExpenseReportsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Reject(Guid id, ReviewExpenseReportForm form, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)

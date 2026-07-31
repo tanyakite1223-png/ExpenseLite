@@ -117,6 +117,7 @@ public sealed class ProjectAppService
         => new(
             report.Id,
             report.Title,
+            report.ApplicantUserId,
             report.ApplicantName,
             report.Status,
             report.ExpenseType,

@@ -1,5 +1,7 @@
 using ExpenseLite.Application.CashAdvances;
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Projects;
 using ExpenseLite.Domain.Shared;
@@ -99,6 +101,7 @@ public sealed class ExpenseReportAppService
     public async Task UpdateAsync(UpdateExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
         var report = await GetRequiredReportAsync(command.Id, cancellationToken);
+        EnsureCanBeEditedBy(report, command.Editor);
 
         await EnsureProjectCanBeUsedAsync(
             command.ExpenseType,
@@ -123,6 +126,7 @@ public sealed class ExpenseReportAppService
     public async Task AddDetailAsync(AddExpenseDetailCommand command, CancellationToken cancellationToken = default)
     {
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeEditedBy(report, command.Editor);
 
         report.AddDetail(
             command.ExpenseDate,
@@ -135,11 +139,12 @@ public sealed class ExpenseReportAppService
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RemoveDetailAsync(Guid reportId, Guid detailId, CancellationToken cancellationToken = default)
+    public async Task RemoveDetailAsync(RemoveExpenseDetailCommand command, CancellationToken cancellationToken = default)
     {
-        var report = await GetRequiredReportAsync(reportId, cancellationToken);
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeEditedBy(report, command.Editor);
 
-        report.RemoveDetail(detailId);
+        report.RemoveDetail(command.DetailId);
 
         await _reports.SaveChangesAsync(cancellationToken);
     }
@@ -147,6 +152,7 @@ public sealed class ExpenseReportAppService
     public async Task UpdateDetailAsync(UpdateExpenseDetailCommand command, CancellationToken cancellationToken = default)
     {
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeEditedBy(report, command.Editor);
 
         report.UpdateDetail(
             command.DetailId,
@@ -160,9 +166,10 @@ public sealed class ExpenseReportAppService
         await _reports.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task SubmitAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task SubmitAsync(SubmitExpenseReportCommand command, CancellationToken cancellationToken = default)
     {
-        var report = await GetRequiredReportAsync(id, cancellationToken);
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeEditedBy(report, command.Editor);
 
         await EnsureProjectCanBeSubmittedAsync(report, cancellationToken);
 
@@ -203,6 +210,20 @@ public sealed class ExpenseReportAppService
         var report = await _reports.GetByIdAsync(id, cancellationToken);
 
         return report ?? throw new DomainRuleViolationException("找不到指定的報銷單。");
+    }
+
+    /// <summary>
+    /// 只有申請人本人可以修改 / 送審自己的報銷單，主管沒有例外——主管的角色是審核，不是代改。
+    /// 這是 resource-based authorization：要先載入報銷單才知道申請人是誰，所以必須放在 Application 層；
+    /// 不像「主管才能核准」那種純角色檢查，可以在 Controller 用 [Authorize(Roles = ...)] 就擋掉。
+    /// ApplicantUserId 為 null 是登入功能之前的舊資料，沒有申請人可比對，一律視為不可修改。
+    /// </summary>
+    private static void EnsureCanBeEditedBy(ExpenseReport report, CurrentUser editor)
+    {
+        if (report.ApplicantUserId != editor.UserId)
+        {
+            throw new ForbiddenOperationException("只有申請人可以修改或送審自己的報銷單。");
+        }
     }
 
     private async Task EnsureProjectCanBeUsedAsync(
@@ -308,6 +329,7 @@ public sealed class ExpenseReportAppService
         => new(
             report.Id,
             report.Title,
+            report.ApplicantUserId,
             report.ApplicantName,
             report.Status,
             report.ExpenseType,
@@ -365,6 +387,7 @@ public sealed class ExpenseReportAppService
         => new(
             report.Id,
             report.Title,
+            report.ApplicantUserId,
             report.ApplicantName,
             report.Status,
             report.ExpenseType,

@@ -2,10 +2,15 @@ using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.Identity;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.CashAdvances;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ExpenseLite.Web.Controllers;
 
+// 預支款整塊限主管：建立、修改、登記結清、標記不採用都是財務作業。
+// 連列表與詳情也關起來，是因為現在的領款人（PayeeName）只是手動輸入的字串、沒有對應 UserId，
+// 沒辦法過濾成「我的預支款」。等領款人改成存 UserId 之後，再放寬給領款人本人。
+[Authorize(Roles = ExpenseLiteRoles.Manager)]
 public sealed class CashAdvancesController : Controller
 {
     private readonly CashAdvanceAppService _cashAdvances;

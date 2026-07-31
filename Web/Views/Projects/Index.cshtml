@@ -9,7 +9,10 @@
         <h1 class="h3 mb-1">專案</h1>
         <div class="text-muted">專案支出報銷單會連到這裡的專案資料</div>
     </div>
-    <a class="btn btn-primary" asp-action="Create">新增專案</a>
+    @if (User.IsManager())
+    {
+        <a class="btn btn-primary" asp-action="Create">新增專案</a>
+    }
 </div>
 
 <form asp-action="Index" method="get" class="d-flex gap-2 mb-3">
@@ -70,14 +73,14 @@ else
                     <td>@project.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@project.Id">檢視</a>
-                        @if (project.Status == ProjectStatus.Active && project.UnfinishedExpenseReportCount == 0)
+                        @if (User.IsManager() && project.Status == ProjectStatus.Active && project.UnfinishedExpenseReportCount == 0)
                         {
                             <form asp-action="Close" asp-route-id="@project.Id" method="post" class="d-inline"
                                   onsubmit="return confirm('確定要將這個專案結案嗎？結案後不可再新增該專案支出報銷單。');">
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">結案</button>
                             </form>
                         }
-                        else if (project.Status == ProjectStatus.Active)
+                        else if (User.IsManager() && project.Status == ProjectStatus.Active)
                         {
                             <span class="text-muted small">有未完成報銷單</span>
                         }

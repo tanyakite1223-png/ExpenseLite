@@ -13,6 +13,7 @@ public sealed record CreateExpenseReportCommand(
 
 public sealed record UpdateExpenseReportCommand(
     Guid Id,
+    CurrentUser Editor,
     string Title,
     ExpenseType ExpenseType,
     Guid? ProjectId,
@@ -21,6 +22,7 @@ public sealed record UpdateExpenseReportCommand(
 
 public sealed record AddExpenseDetailCommand(
     Guid ReportId,
+    CurrentUser Editor,
     DateOnly ExpenseDate,
     string Category,
     string Description,
@@ -31,12 +33,22 @@ public sealed record AddExpenseDetailCommand(
 public sealed record UpdateExpenseDetailCommand(
     Guid ReportId,
     Guid DetailId,
+    CurrentUser Editor,
     DateOnly ExpenseDate,
     string Category,
     string Description,
     ExpenseReceiptType ReceiptType,
     string? InvoiceNumber,
     decimal Amount);
+
+public sealed record RemoveExpenseDetailCommand(
+    Guid ReportId,
+    Guid DetailId,
+    CurrentUser Editor);
+
+public sealed record SubmitExpenseReportCommand(
+    Guid ReportId,
+    CurrentUser Editor);
 
 public sealed record ReviewExpenseReportCommand(
     Guid ReportId,

@@ -6,6 +6,7 @@ namespace ExpenseLite.Application.ExpenseReports;
 public sealed record ExpenseReportListItemDto(
     Guid Id,
     string Title,
+    Guid? ApplicantUserId,
     string ApplicantName,
     ExpenseReportStatus Status,
     ExpenseType ExpenseType,
@@ -33,6 +34,7 @@ public sealed record ExpenseReportListPageDto(
 public sealed record ExpenseReportDetailDto(
     Guid Id,
     string Title,
+    Guid? ApplicantUserId,
     string ApplicantName,
     ExpenseReportStatus Status,
     ExpenseType ExpenseType,

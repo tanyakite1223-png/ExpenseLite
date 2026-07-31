@@ -2,8 +2,12 @@
 
 @{
     ViewData["Title"] = Model.Report.Title;
-    var canEdit = Model.Report.Status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
-    var canReview = Model.Report.Status is ExpenseReportStatus.Submitted;
+    // 這裡算出來的旗標只用來決定「按鈕要不要顯示」，是 UX。
+    // 真正阻止未授權操作的是 Application Service 與 [Authorize]，不是這幾行。
+    var isApplicant = Model.Report.ApplicantUserId == User.GetUserId();
+    var canEdit = isApplicant
+        && Model.Report.Status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
+    var canReview = User.IsManager() && Model.Report.Status is ExpenseReportStatus.Submitted;
     var isClosedProjectReport = Model.Report.ExpenseType == ExpenseType.Project
         && Model.Report.ProjectStatus == ProjectStatus.Closed;
     var canSubmit = canEdit && Model.Report.Details.Count > 0 && !isClosedProjectReport;
@@ -253,6 +257,10 @@
                     <button type="submit" class="btn btn-primary">加入明細</button>
                 </form>
             }
+        }
+        else if (!isApplicant)
+        {
+            <div class="alert alert-info">只有申請人可以修改這張報銷單的明細。</div>
         }
         else
         {

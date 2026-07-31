@@ -1,6 +1,8 @@
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.Projects;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ExpenseLite.Web.Controllers;
@@ -31,6 +33,9 @@ public sealed class ProjectsController : Controller
         return View(project);
     }
 
+    // 列表與詳情所有人都看得到（員工建報銷單要選專案），但建立與結案限主管。
+    // 結案會擋掉其他人的報銷單送審，不該讓員工做。
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public IActionResult Create()
     {
         return View(new CreateProjectForm());
@@ -38,6 +43,7 @@ public sealed class ProjectsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Create(
         CreateProjectForm form,
         CancellationToken cancellationToken)
@@ -64,6 +70,7 @@ public sealed class ProjectsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Close(Guid id, CancellationToken cancellationToken)
     {
         try

@@ -3,6 +3,7 @@ using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure;
 using ExpenseLite.Infrastructure.Identity;
+using ExpenseLite.Web.Filters;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +12,10 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 // Add services to the container.
-builder.Services.AddControllersWithViews()
+builder.Services.AddControllersWithViews(options =>
+    {
+        options.Filters.Add<ForbiddenOperationExceptionFilter>();
+    })
     .AddRazorOptions(options =>
     {
         options.ViewLocationFormats.Clear();
