@@ -288,7 +288,7 @@ aggregate 邊界紀律：
 **要做的：**
 
 1. ⬜ `CashAdvance` 加 `PayeeUserId`，`PayeeName` 保留為姓名快照（比照既有的「UserId + 姓名快照」慣例）
-2. ⬜ 新增 `Domain/CashAdvances/CashAdvanceUsage`：`{ Personal, PettyCash }`（命名待確認），UI 文案「個人預支 / 零用金（共用）」
+2. ⬜ 新增 `Domain/CashAdvances/CashAdvanceUsage`：`{ Personal, PettyCash }`（2026-07-31 定案），UI 文案「個人預支 / 零用金（共用）」。放在 `Domain/CashAdvances/`，比照既有的 `CashAdvanceSettlementType`
 3. ⬜ 建立預支款的領款人改成使用者下拉。**需要新增「列出可選使用者」的查詢**——目前沒有，要在 `Application/Identity` 加一個介面（例如 `IUserDirectory`）+ Infrastructure 用 `UserManager` 實作。階段 6 的使用者管理頁也會用到，不算白做。
 4. ⬜ migration
 5. ⬜ 報銷單的預支款下拉過濾（落點 Application Service）：零用金全員可選；個人預支只有 `PayeeUserId == 登入者` 可選
@@ -308,9 +308,7 @@ aggregate 邊界紀律：
 - 注意「migration 幫舊資料填什麼」和「新建表單預設什麼」是**兩個獨立的決定**，這次剛好方向相反（backfill 零用金、新建預設個人預支），各有各的理由。
 - 舊資料的實際內容見〈開發環境狀態 / 開發 DB〉。
 
-**還沒決定的：**
-
-- `CashAdvanceUsage` 的 enum 命名與 UI 文案（目前提案 `{ Personal, PettyCash }`／「個人預支 / 零用金（共用）」）。
+**4b 已無待決事項**，可以直接開工。
 
 ### 階段 6：帳號自助註冊與使用者管理
 
