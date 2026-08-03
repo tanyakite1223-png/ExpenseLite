@@ -8,8 +8,8 @@
 
 | 類型 | 問題長相 | 需要載入資料嗎 | 落點 | 本專案的例子 |
 | --- | --- | --- | --- | --- |
-| 角色授權 | 「你是不是主管？」 | 不用，看 cookie 裡的角色 claim 就知道 | **Controller** 的 `[Authorize(Roles = ...)]` | 核准 / 退回 / 拒絕報銷單；預支款整塊；建立 / 結案專案 |
-| 資源授權 | 「這筆資料是不是你的？」 | 要，得先把報銷單讀出來才知道申請人是誰 | **Application Service** | 只有申請人能修改 / 送審自己的報銷單 |
+| 角色授權 | 「你是不是主管？」 | 不用，看 cookie 裡的角色 claim 就知道 | **Controller** 的 `[Authorize(Roles = ...)]` | 核准 / 退回 / 拒絕報銷單；預支款的建立 / 修改 / 結清；建立 / 結案專案 |
+| 資源授權 | 「這筆資料是不是你的？」 | 要，得先把資料讀出來才知道申請人 / 領款人是誰 | **Application Service** | 只有申請人能修改 / 送審自己的報銷單；只有主管或領款人看得到一筆預支款 |
 
 判斷方法很簡單：**如果不用讀資料庫就能決定，那就擋在 Controller。** 反過來，只要判斷需要「這筆資料的某個欄位」，Controller 就不該做——它得先呼叫 Application Service 拿資料，那就已經進到 Application 層了，不如一開始就在那裡判斷。
 
@@ -24,7 +24,7 @@ public async Task<IActionResult> Approve(...)
 
 Controller 仍然是薄的——`[Authorize]` 不是它「寫」的邏輯，是它宣告的一個條件，實際執行的是 ASP.NET Core 的授權中介層。這比在 Application Service 裡寫 `if (!isManager) throw` 好，因為請求連 Controller 都進不來，也不用把「角色」這個 Identity 概念傳進 Application。
 
-`CashAdvancesController` 是標在**整個 class** 上，因為預支款的每個動作都限主管。
+`CashAdvancesController` 一開始是標在**整個 class** 上的，因為那時預支款的每個動作都限主管。後來領款人存了 UserId、可以判斷「這筆是不是你的」之後，class 層的標註就拆掉了，改成只標在會**動資料**的 action（建立、修改、登記 / 修改 / 不採用結清）；列表與詳情這兩個**看**的 action 不標，改由 Application Service 依領款人過濾。這是一個典型的演進：**能用角色表達的就用 `[Authorize]`，表達不了的才往下沉。**
 
 ### 資源授權：擋在 Application Service
 
@@ -39,6 +39,37 @@ private static void EnsureCanBeEditedBy(ExpenseReport report, CurrentUser editor
 ```
 
 `UpdateAsync`、`AddDetailAsync`、`UpdateDetailAsync`、`RemoveDetailAsync`、`SubmitAsync` 每一個都在載入報銷單之後、動它之前呼叫這個檢查。
+
+預支款的可見度是同一種東西，只是判斷條件多了角色：
+
+```csharp
+private static void EnsureCanBeViewedBy(CashAdvance cashAdvance, CurrentUser viewer)
+{
+    if (viewer.IsManager || cashAdvance.PayeeUserId == viewer.UserId)
+    {
+        return;
+    }
+
+    throw new ForbiddenOperationException("只有主管或這筆預支款的領款人可以查看。");
+}
+```
+
+列表用同一條規則的布林版本先過濾再算總筆數，`GetDetailsAsync` 則直接丟例外。**先過濾再算總數**是刻意的：否則員工進到空列表會看到「沒有符合篩選條件」，但其實是那些資料根本不該給他看。
+
+#### `CurrentUser` 為什麼多了 `IsManager`
+
+前一篇說「Application 不認識角色，角色檢查留在 Controller」。這裡加了 `CurrentUser.IsManager`，看起來像打臉，其實界線沒變：
+
+- **純角色檢查**（「只有主管能核准」）仍然擋在 `[Authorize]`，Application 不參與。
+- 但「**同一份資料，主管看得比較多**」不是純角色檢查——它要同時看角色與資料的擁有者，`[Authorize]` 表達不出來。這時 Application 就得知道呼叫者是不是主管。
+
+`CurrentUser` 是 Application 自己的型別（不是 `ClaimsPrincipal`），所以多一個布林值不會讓 Application 綁到 ASP.NET Core Identity 上。Domain 仍然完全不認識角色。
+
+### 不是授權，卻常被誤認的：零用金 vs 個人預支
+
+報銷單的「對應預支款」下拉會過濾掉別人的個人預支，這**不是**權限規則——連主管都不能拿別人的個人預支來報自己的單。它是模型欄位 `CashAdvanceUsage` 決定的，理由見〈預支款為什麼獨立成 CashAdvance〉。
+
+分辨方法：**如果換一個角色答案就會變，那是授權；如果不管誰來答案都一樣，那是模型或業務規則。**
 
 ## 為什麼不放進 Entity
 
@@ -87,12 +118,16 @@ var canEdit = isApplicant && Model.Report.Status is ...;
 | 建立報銷單 | 所有登入者，申請人自動是自己 |
 | 修改 / 送審報銷單、增刪改明細 | **只有申請人本人**（主管沒有例外） |
 | 核准 / 退回 / 拒絕 | 只有主管 |
-| 預支款全部功能（含列表、詳情） | 只有主管 |
+| 看預支款列表 | 所有登入者，但只列出自己是領款人的；主管看全部 |
+| 看預支款詳情（財務核對視角） | **主管，或這筆的領款人本人** |
+| 建立 / 修改預支款、登記 / 修改 / 不採用結清紀錄 | 只有主管 |
+| 報銷單引用某筆預支款 | 零用金：所有人；個人預支：只有領款人本人（**不是授權，是模型規則**） |
 | 專案列表 / 詳情 | 所有登入者（員工建報銷單要選專案） |
 | 建立 / 結案專案 | 只有主管 |
+
+零用金的「其他使用者」看不到那筆的詳情頁，這是刻意的：詳情頁是財務核對視角（差額、應結清、結清紀錄），他們只需要開自己的報銷單；想知道還剩多少就直接問保管人——跟現實中零用金放抽屜一樣。但零用金**會**出現在所有人的報銷單下拉（含保管人與金額），因為選不到看不見的東西，而且使用者本來就要知道去找誰領。所以「看不到詳情」不等於「不知道它存在」。
 
 ## 還沒做的
 
 - **員工還看得到所有人的報銷單。** 列表與詳情尚未依 `ApplicantUserId` 過濾。
-- **預支款的可見度目前過度保守。** 領款人（`PayeeName`）現在只是手動輸入的字串、沒有對應 UserId，所以無法過濾成「我的預支款」，只能整塊關給主管。等領款人改成存 UserId 之後，要放寬給領款人本人——保管零用金的人需要看得到那筆錢的使用狀態。
-- **報銷單建立時的「對應預支款」下拉選單仍列出全部未結清預支款**，員工在那裡會看到其他人的領款人與金額。同樣要等領款人存了 UserId 才能過濾。
+- **預支款的用途類型建立後無法修改。** 選錯只能靠建立當下的預設值與提示擋住，系統沒有更正出口（也沒有刪除功能）。要不要開放修改、開放到什麼條件，還沒決定。

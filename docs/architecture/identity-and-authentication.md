@@ -37,7 +37,7 @@ ClaimsPrincipal（登入 cookie）
 三個刻意的設計：
 
 **1. Application 只認識 `CurrentUser`，不認識 `ClaimsPrincipal`。**
-`CurrentUser(Guid UserId, string DisplayName)` 是 Application 自己的型別。Controller 負責把 cookie 裡的身分翻譯成它——這正好是 Controller 該做的事（接 HTTP、model binding），所以 Controller 仍然是薄的。反過來如果讓 Application Service 直接讀 `HttpContext`，Application 就綁死在 Web 上了。
+`CurrentUser(Guid UserId, string DisplayName, bool IsManager)` 是 Application 自己的型別。Controller 負責把 cookie 裡的身分翻譯成它——這正好是 Controller 該做的事（接 HTTP、model binding），所以 Controller 仍然是薄的。反過來如果讓 Application Service 直接讀 `HttpContext`，Application 就綁死在 Web 上了。（`IsManager` 只用在「同一份資料，主管看得比較多」這種判斷；純角色檢查仍留在 `[Authorize]`，理由見〈[授權規則放在哪一層](authorization.md)〉。）
 
 **2. 同時存 UserId 和姓名，而且姓名是「快照」。**
 每個地方都存兩個欄位，例如 `ApplicantUserId`（`Guid?`）和 `ApplicantName`（`string`）：
@@ -52,9 +52,28 @@ UserId 是 nullable，因為導入登入機制之前建立的舊資料沒有帳�
 **3. 補回歷史紀錄的人名時，不要覆蓋原本的人。**
 `CashAdvanceSettlementRecord.Update()` 刻意**不接**處理人參數：處理人是當初登記這筆結清的人，之後別人來更正金額或備註都不會換掉它，理由同上——歷史不該被改寫。代價是「這次是誰改的」目前只有 `UpdatedAt` 時間、沒有名字；真的需要時再加 `UpdatedByUserId`。
 
-另外，預支款的**領款人（`PayeeName`）目前是手動輸入的字串**，因為它是「錢給了誰」，不是「誰在操作系統」——主管很可能替員工建立預支款。分辨「操作者」與「當事人」是這一段的重點：只有操作者才該自動帶入登入者。
+**4. 「操作者」自動帶入登入者，「當事人」不會。**
+預支款的**領款人**是「錢給了誰」，不是「誰在操作系統」——主管很可能替員工建立預支款，所以它是表單上的一個使用者下拉，不是自動帶入。分辨這兩者是這一段的重點。
 
-不過「不自動帶入登入者」不等於「只能存字串」。領款人之後會改成**從使用者清單選、存 `PayeeUserId` + 姓名快照**（仍然不是自動帶登入者，是主管挑人），因為沒有 UserId 就無法判斷「這筆預支款是不是我的」，連「員工只看自己的預支款」都做不到。這是待辦，見〈[授權規則放在哪一層](authorization.md)〉的「還沒做的」。
+但「不自動帶入登入者」不等於「只能存字串」：領款人一樣存 `PayeeUserId` + `PayeeName` 姓名快照，只是 UserId 來自主管挑的人而不是登入者。沒有 UserId 就無法判斷「這筆預支款是不是我的」，連下拉過濾與「員工只看自己的預支款」都做不到。
+
+## 「系統裡有哪些人」怎麼查：`IUserDirectory`
+
+要畫「領款人」下拉，Application 得知道有哪些使用者——但它不認識 `UserManager<ApplicationUser>`（那是 Infrastructure 的東西）。所以在 `Application/Identity` 定義介面、在 `Infrastructure/Identity` 實作：
+
+```csharp
+public interface IUserDirectory
+{
+    Task<IReadOnlyList<UserOptionDto>> ListSelectableAsync(CancellationToken ct = default);
+    Task<UserOptionDto?> FindByIdAsync(Guid userId, CancellationToken ct = default);
+}
+```
+
+這跟 repository 是同一個依賴反轉（dependency inversion）的形狀：**介面由使用它的那一層定義，實作往外推。** 依賴方向仍然是 `Web → Application → Domain`，Infrastructure 只是在 DI 容器裡把實作插進來。
+
+`FindByIdAsync` 不只是為了查一個人，它撐住了一條安全規則：**建立預支款的命令只帶 `PayeeUserId`，不帶姓名。** 姓名快照由 Application 自己查出來，不接受 Web 層送進來的字串——否則有人竄改表單就能讓紀錄上的名字跟帳號對不上。
+
+兩個方法的 `IsActive` 過濾也刻意不同：`ListSelectableAsync` 只列啟用中的帳號（不該把錢指派給離職的人），`FindByIdAsync` 不過濾（帳號停用之後，歷史紀錄上的人還是得查得到）。
 
 ## 資料表命名
 
