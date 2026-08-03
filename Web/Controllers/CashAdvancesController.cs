@@ -1,5 +1,6 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.Identity;
+using ExpenseLite.Domain.CashAdvances;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.CashAdvances;
 using Microsoft.AspNetCore.Authorization;
@@ -7,10 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ExpenseLite.Web.Controllers;
 
-// 預支款整塊限主管：建立、修改、登記結清、標記不採用都是財務作業。
-// 連列表與詳情也關起來，是因為現在的領款人（PayeeName）只是手動輸入的字串、沒有對應 UserId，
-// 沒辦法過濾成「我的預支款」。等領款人改成存 UserId 之後，再放寬給領款人本人。
-[Authorize(Roles = ExpenseLiteRoles.Manager)]
+// 預支款的「動作」都是財務作業，仍然限主管：建立、修改、登記結清、標記不採用。
+// 但「看」放寬了——領款人要看得到自己那筆錢的使用狀態，保管零用金的人尤其需要。
+// 列表與詳情因此改成所有登入者可進入，由 Application Service 依領款人過濾內容，
+// 這是資源授權（要載入資料才知道領款人是誰），不能用 [Authorize] 表達。
 public sealed class CashAdvancesController : Controller
 {
     private readonly CashAdvanceAppService _cashAdvances;
@@ -27,14 +28,16 @@ public sealed class CashAdvancesController : Controller
     {
         var page = await _cashAdvances.ListPageAsync(
             new CashAdvanceListQuery(keyword, reconciliationStatus),
+            User.ToCurrentUser(),
             cancellationToken);
 
         return View(page);
     }
 
-    public IActionResult Create()
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
+    public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
-        return View(new CreateCashAdvanceForm());
+        return View(await BuildCreateFormAsync(new CreateCashAdvanceForm(), cancellationToken));
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
@@ -52,6 +55,7 @@ public sealed class CashAdvancesController : Controller
         return View(page);
     }
 
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
     {
         var page = await BuildEditCashAdvancePageAsync(
@@ -68,36 +72,50 @@ public sealed class CashAdvancesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Create(
         CreateCashAdvanceForm form,
         CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
-            return View(form);
+            return View(await BuildCreateFormAsync(form, cancellationToken));
         }
 
         try
         {
             await _cashAdvances.CreateAsync(
                 new CreateCashAdvanceCommand(
-                    form.PayeeName,
+                    form.PayeeUserId!.Value,
+                    form.Usage,
                     form.Purpose,
                     form.AdvancedAt,
                     form.Amount),
                 cancellationToken);
+
+            if (form.Usage == CashAdvanceUsage.PettyCash)
+            {
+                // 這不是「成功」訊息而是提醒：選錯用途類型的後果是別人也能把這筆錢報掉，
+                // 所以要在建立當下就講明白，而不是等到有人誤用才發現。
+                TempData["WarningMessage"] = "這筆是零用金（共用），所有人的報銷單都能引用它。";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = "預支款已建立。";
+            }
 
             return RedirectToAction(nameof(Index));
         }
         catch (DomainRuleViolationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return View(form);
+            return View(await BuildCreateFormAsync(form, cancellationToken));
         }
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> Edit(
         Guid id,
         [Bind(Prefix = "CashAdvanceForm")]
@@ -151,6 +169,7 @@ public sealed class CashAdvancesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> RecordSettlement(
         Guid id,
         [Bind(Prefix = "Settlement")]
@@ -206,6 +225,7 @@ public sealed class CashAdvancesController : Controller
         }
     }
 
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> EditSettlement(
         Guid id,
         Guid settlementRecordId,
@@ -232,6 +252,7 @@ public sealed class CashAdvancesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> EditSettlement(
         Guid id,
         Guid settlementRecordId,
@@ -289,6 +310,7 @@ public sealed class CashAdvancesController : Controller
         }
     }
 
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> VoidSettlement(
         Guid id,
         Guid settlementRecordId,
@@ -315,6 +337,7 @@ public sealed class CashAdvancesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
     public async Task<IActionResult> VoidSettlement(
         Guid id,
         Guid settlementRecordId,
@@ -371,13 +394,21 @@ public sealed class CashAdvancesController : Controller
         }
     }
 
+    private async Task<CreateCashAdvanceForm> BuildCreateFormAsync(
+        CreateCashAdvanceForm form,
+        CancellationToken cancellationToken)
+    {
+        form.PayeeOptions = await _cashAdvances.ListPayeeOptionsAsync(cancellationToken);
+        return form;
+    }
+
     private async Task<CashAdvanceSettlementPage?> BuildSettlementPageAsync(
         Guid id,
         RecordCashAdvanceSettlementForm form,
         bool useDefaultAmount,
         CancellationToken cancellationToken)
     {
-        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, cancellationToken);
+        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         if (cashAdvance is null)
         {
             return null;
@@ -401,7 +432,7 @@ public sealed class CashAdvancesController : Controller
         EditCashAdvanceForm? form,
         CancellationToken cancellationToken)
     {
-        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, cancellationToken);
+        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         if (cashAdvance is null)
         {
             return null;
@@ -427,7 +458,7 @@ public sealed class CashAdvancesController : Controller
         EditCashAdvanceSettlementForm? form,
         CancellationToken cancellationToken)
     {
-        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, cancellationToken);
+        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         var record = FindSettlementRecord(cashAdvance, settlementRecordId);
         if (cashAdvance is null || record is null)
         {
@@ -457,7 +488,7 @@ public sealed class CashAdvancesController : Controller
         VoidCashAdvanceSettlementForm form,
         CancellationToken cancellationToken)
     {
-        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, cancellationToken);
+        var cashAdvance = await _cashAdvances.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         var record = FindSettlementRecord(cashAdvance, settlementRecordId);
         if (cashAdvance is null || record is null)
         {

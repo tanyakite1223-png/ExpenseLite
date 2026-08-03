@@ -1,4 +1,6 @@
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Identity;
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.CashAdvances;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Shared;
@@ -10,27 +12,24 @@ public sealed class CashAdvanceAppService
 {
     private readonly ICashAdvanceRepository _cashAdvances;
     private readonly IExpenseReportRepository _reports;
+    private readonly IUserDirectory _users;
 
     public CashAdvanceAppService(
         ICashAdvanceRepository cashAdvances,
-        IExpenseReportRepository reports)
+        IExpenseReportRepository reports,
+        IUserDirectory users)
     {
         _cashAdvances = cashAdvances;
         _reports = reports;
-    }
-
-    public async Task<IReadOnlyList<CashAdvanceListItemDto>> ListAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var list = await BuildListItemsAsync(cancellationToken);
-        return list.Items;
+        _users = users;
     }
 
     public async Task<CashAdvanceListPageDto> ListPageAsync(
         CashAdvanceListQuery query,
+        CurrentUser viewer,
         CancellationToken cancellationToken = default)
     {
-        var list = await BuildListItemsAsync(cancellationToken);
+        var list = await BuildListItemsAsync(viewer, cancellationToken);
         var normalizedKeyword = NormalizeKeyword(query.Keyword);
 
         var items = list.Items
@@ -44,13 +43,20 @@ public sealed class CashAdvanceAppService
             items);
     }
 
+    /// <summary>
+    /// 報銷單「對應預支款」下拉的選項。零用金是共用的，所有人都能引用；
+    /// 個人預支只有領款人本人能引用，否則別人的錢會被報掉。
+    /// 這是模型決定的，不是角色決定的——主管也不能拿別人的個人預支來報自己的單。
+    /// </summary>
     public async Task<IReadOnlyList<CashAdvanceOptionDto>> ListOpenOptionsAsync(
+        CurrentUser viewer,
         CancellationToken cancellationToken = default)
     {
         var cashAdvances = await _cashAdvances.ListAsync(cancellationToken);
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
 
         return cashAdvances
+            .Where(x => CanBeReferencedBy(x, viewer))
             .OrderByDescending(x => x.AdvancedAt)
             .ThenBy(x => x.PayeeName)
             .Select(x => new
@@ -64,12 +70,23 @@ public sealed class CashAdvanceAppService
             .ToList();
     }
 
+    /// <summary>建立預支款時可以指派的領款人。</summary>
+    public Task<IReadOnlyList<UserOptionDto>> ListPayeeOptionsAsync(
+        CancellationToken cancellationToken = default)
+        => _users.ListSelectableAsync(cancellationToken);
+
     public async Task<Guid> CreateAsync(
         CreateCashAdvanceCommand command,
         CancellationToken cancellationToken = default)
     {
+        // 姓名快照由這裡查出來，不從表單接——表單只給 UserId，名字以系統當下的資料為準。
+        var payee = await _users.FindByIdAsync(command.PayeeUserId, cancellationToken)
+            ?? throw new DomainRuleViolationException("找不到指定的領款人。");
+
         var cashAdvance = CashAdvance.Create(
-            command.PayeeName,
+            payee.UserId,
+            payee.DisplayName,
+            command.Usage,
             command.Purpose,
             command.AdvancedAt,
             Money.From(command.Amount));
@@ -100,6 +117,7 @@ public sealed class CashAdvanceAppService
 
     public async Task<CashAdvanceSettlementDetailDto?> GetDetailsAsync(
         Guid id,
+        CurrentUser viewer,
         CancellationToken cancellationToken = default)
     {
         var cashAdvance = await _cashAdvances.GetByIdAsync(id, cancellationToken);
@@ -107,6 +125,8 @@ public sealed class CashAdvanceAppService
         {
             return null;
         }
+
+        EnsureCanBeViewedBy(cashAdvance, viewer);
 
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
         var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
@@ -212,6 +232,31 @@ public sealed class CashAdvanceAppService
         return cashAdvance;
     }
 
+    /// <summary>
+    /// 誰看得到一筆預支款的財務核對視角（差額、應結清、結清紀錄）：主管，或這筆的領款人本人。
+    /// 領款人要看得到自己那筆錢的使用狀態，保管零用金的人尤其需要；
+    /// 但零用金的其他使用者不需要看核對頁——他們只要開自己的報銷單，想知道還剩多少就問保管人。
+    /// 這是 resource-based authorization：要先載入才知道領款人是誰，所以擋在 Application 而不是 Controller。
+    /// PayeeUserId 為 null 是登入功能之前的舊資料，沒有領款人可比對，只有主管看得到。
+    /// </summary>
+    private static void EnsureCanBeViewedBy(CashAdvance cashAdvance, CurrentUser viewer)
+    {
+        if (viewer.IsManager || cashAdvance.PayeeUserId == viewer.UserId)
+        {
+            return;
+        }
+
+        throw new ForbiddenOperationException("只有主管或這筆預支款的領款人可以查看。");
+    }
+
+    private static bool CanBeViewedBy(CashAdvance cashAdvance, CurrentUser viewer)
+        => viewer.IsManager || cashAdvance.PayeeUserId == viewer.UserId;
+
+    /// <summary>零用金是共用的，誰都能開報銷單引用；個人預支只有領款人本人能引用。</summary>
+    private static bool CanBeReferencedBy(CashAdvance cashAdvance, CurrentUser viewer)
+        => cashAdvance.Usage == CashAdvanceUsage.PettyCash ||
+           cashAdvance.PayeeUserId == viewer.UserId;
+
     private static CashAdvanceSettlementRecord GetExistingSettlementRecord(
         CashAdvance cashAdvance,
         Guid settlementRecordId)
@@ -315,13 +360,19 @@ public sealed class CashAdvanceAppService
     }
 
     private async Task<(int TotalCashAdvanceCount, IReadOnlyList<CashAdvanceListItemDto> Items)> BuildListItemsAsync(
+        CurrentUser viewer,
         CancellationToken cancellationToken)
     {
         var cashAdvances = await _cashAdvances.ListAsync(cancellationToken);
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
         var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
 
-        var items = cashAdvances
+        // 先過濾可見度再算總筆數，「還沒有預支款」和「篩選條件沒中」才不會被別人的資料混淆。
+        var visible = cashAdvances
+            .Where(x => CanBeViewedBy(x, viewer))
+            .ToList();
+
+        var items = visible
             .OrderByDescending(x => x.AdvancedAt)
             .ThenByDescending(x => x.CreatedAt)
             .Select(x => MapListItem(
@@ -330,7 +381,7 @@ public sealed class CashAdvanceAppService
                 inProgressCashAdvanceIds.Contains(x.Id)))
             .ToList();
 
-        return (cashAdvances.Count, items);
+        return (visible.Count, items);
     }
 
     private static CashAdvanceListItemDto MapListItem(
@@ -342,7 +393,9 @@ public sealed class CashAdvanceAppService
 
         return new CashAdvanceListItemDto(
             cashAdvance.Id,
+            cashAdvance.PayeeUserId,
             cashAdvance.PayeeName,
+            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt,
             cashAdvance.Amount.Amount,
@@ -363,6 +416,7 @@ public sealed class CashAdvanceAppService
         => new(
             cashAdvance.Id,
             cashAdvance.PayeeName,
+            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt,
             cashAdvance.Amount.Amount,
@@ -379,7 +433,9 @@ public sealed class CashAdvanceAppService
 
         return new CashAdvanceSettlementDetailDto(
             cashAdvance.Id,
+            cashAdvance.PayeeUserId,
             cashAdvance.PayeeName,
+            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt,
             cashAdvance.Amount.Amount,

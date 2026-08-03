@@ -1,3 +1,4 @@
+using ExpenseLite.Domain.CashAdvances;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Projects;
 
@@ -43,11 +44,24 @@ public sealed record ExpenseReportDetailDto(
     ProjectStatus? ProjectStatus,
     ExpensePaymentMethod PaymentMethod,
     Guid? CashAdvanceId,
+    ExpenseReportCashAdvanceDto? CashAdvance,
     decimal TotalAmount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SubmittedAt,
     IReadOnlyList<ExpenseDetailDto> Details,
     IReadOnlyList<ExpenseReviewRecordDto> ReviewRecords);
+
+/// <summary>
+/// 報銷單詳情頁要顯示「這張單對應哪一筆預支款」。
+/// 只帶識別得出來的欄位，不帶核對金額——那是預支款自己的財務視角，見 CashAdvanceSettlementDetailDto。
+/// 跨 aggregate 一律用 ID 參照，這裡是查詢時才組進 DTO，報銷單本身仍只存 CashAdvanceId。
+/// </summary>
+public sealed record ExpenseReportCashAdvanceDto(
+    Guid Id,
+    string PayeeName,
+    CashAdvanceUsage Usage,
+    string Purpose,
+    DateOnly AdvancedAt);
 
 public sealed record ExpenseDetailDto(
     Guid Id,

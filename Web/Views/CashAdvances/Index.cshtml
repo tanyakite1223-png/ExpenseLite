@@ -4,17 +4,29 @@
     ViewData["Title"] = "預支款";
 }
 
+@{
+    var isManager = User.IsManager();
+}
+
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
         <h1 class="h3 mb-1">預支款</h1>
-        <div class="text-muted">追蹤預支款、已核准報銷與實際結清狀態</div>
+        <div class="text-muted">@(isManager ? "追蹤預支款、已核准報銷與實際結清狀態" : "你領到的預支款與零用金的使用狀態")</div>
     </div>
-    <a class="btn btn-primary" asp-action="Create">新增預支款</a>
+    @if (isManager)
+    {
+        <a class="btn btn-primary" asp-action="Create">新增預支款</a>
+    }
 </div>
 
 @if (TempData["ErrorMessage"] is string errorMessage)
 {
     <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (TempData["WarningMessage"] is string warningMessage)
+{
+    <div class="alert alert-warning">@warningMessage</div>
 }
 
 @if (TempData["SuccessMessage"] is string successMessage)
@@ -58,7 +70,7 @@
 
 @if (Model.CashAdvances.Count == 0)
 {
-    <div class="alert alert-secondary">@EmptyCashAdvanceMessage(Model)</div>
+    <div class="alert alert-secondary">@EmptyCashAdvanceMessage(Model, isManager)</div>
 }
 else
 {
@@ -68,6 +80,7 @@ else
                 <tr>
                     <th>預支日期</th>
                     <th>領款人</th>
+                    <th>用途類型</th>
                     <th>用途</th>
                     <th class="text-end">預支金額</th>
                     <th class="text-end">已核准報銷</th>
@@ -85,6 +98,9 @@ else
                 <tr>
                     <td>@cashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</td>
                     <td>@cashAdvance.PayeeName</td>
+                    <td>
+                        <span class="badge @UsageBadgeClass(cashAdvance.Usage)">@UsageText(cashAdvance.Usage)</span>
+                    </td>
                     <td>@cashAdvance.Purpose</td>
                     <td class="text-end">@cashAdvance.Amount.ToString("N2")</td>
                     <td class="text-end">@cashAdvance.ApprovedReimbursedAmount.ToString("N2")</td>
@@ -104,13 +120,16 @@ else
                             <a class="btn btn-outline-primary"
                                asp-action="Details"
                                asp-route-id="@cashAdvance.Id">
-                                @ActionText(cashAdvance)
+                                @ActionText(cashAdvance, isManager)
                             </a>
-                            <a class="btn btn-outline-secondary"
-                               asp-action="Edit"
-                               asp-route-id="@cashAdvance.Id">
-                                修改
-                            </a>
+                            @if (isManager)
+                            {
+                                <a class="btn btn-outline-secondary"
+                                   asp-action="Edit"
+                                   asp-route-id="@cashAdvance.Id">
+                                    修改
+                                </a>
+                            }
                         </div>
                     </td>
                 </tr>
@@ -140,8 +159,25 @@ else
             _ => settlementType.ToString() ?? "-"
         };
 
-    private static string ActionText(CashAdvanceListItemDto cashAdvance)
+    private static string UsageText(CashAdvanceUsage usage)
+        => usage switch
+        {
+            CashAdvanceUsage.Personal => "個人預支",
+            CashAdvanceUsage.PettyCash => "零用金（共用）",
+            _ => usage.ToString()
+        };
+
+    private static string UsageBadgeClass(CashAdvanceUsage usage)
+        => usage == CashAdvanceUsage.PettyCash ? "bg-info text-dark" : "bg-light text-dark border";
+
+    // 只有主管能登記結清，所以員工看到的一律是「查看」。
+    private static string ActionText(CashAdvanceListItemDto cashAdvance, bool isManager)
     {
+        if (!isManager)
+        {
+            return "查看";
+        }
+
         if (cashAdvance.HasInProgressReports)
         {
             return "查看暫估";
@@ -154,8 +190,15 @@ else
         => !string.IsNullOrWhiteSpace(page.Keyword) ||
            page.ReconciliationStatus is not null;
 
-    private static string EmptyCashAdvanceMessage(CashAdvanceListPageDto page)
-        => page.TotalCashAdvanceCount == 0
+    private static string EmptyCashAdvanceMessage(CashAdvanceListPageDto page, bool isManager)
+    {
+        if (page.TotalCashAdvanceCount > 0)
+        {
+            return "沒有符合篩選條件的預支款。";
+        }
+
+        return isManager
             ? "目前還沒有預支款。"
-            : "沒有符合篩選條件的預支款。";
+            : "目前沒有你的預支款。你是零用金保管人時，這裡也會看得到那筆零用金。";
+    }
 }

@@ -68,7 +68,9 @@ public sealed class ExpenseReportAppService
         }
 
         var project = await GetProjectAsync(report.ProjectId, cancellationToken);
-        return MapDetails(report, project?.Name, project?.Status);
+        var cashAdvance = await GetCashAdvanceSummaryAsync(report.CashAdvanceId, cancellationToken);
+
+        return MapDetails(report, project?.Name, project?.Status, cashAdvance);
     }
 
     public async Task<Guid> CreateAsync(CreateExpenseReportCommand command, CancellationToken cancellationToken = default)
@@ -299,6 +301,29 @@ public sealed class ExpenseReportAppService
         return await _projects.GetByIdAsync(projectId.Value, cancellationToken);
     }
 
+    private async Task<ExpenseReportCashAdvanceDto?> GetCashAdvanceSummaryAsync(
+        Guid? cashAdvanceId,
+        CancellationToken cancellationToken)
+    {
+        if (cashAdvanceId is null)
+        {
+            return null;
+        }
+
+        var cashAdvance = await _cashAdvances.GetByIdAsync(cashAdvanceId.Value, cancellationToken);
+        if (cashAdvance is null)
+        {
+            return null;
+        }
+
+        return new ExpenseReportCashAdvanceDto(
+            cashAdvance.Id,
+            cashAdvance.PayeeName,
+            cashAdvance.Usage,
+            cashAdvance.Purpose,
+            cashAdvance.AdvancedAt);
+    }
+
     private async Task EnsureProjectCanBeSubmittedAsync(
         ExpenseReport report,
         CancellationToken cancellationToken)
@@ -383,7 +408,8 @@ public sealed class ExpenseReportAppService
     private static ExpenseReportDetailDto MapDetails(
         ExpenseReport report,
         string? projectName,
-        ProjectStatus? projectStatus)
+        ProjectStatus? projectStatus,
+        ExpenseReportCashAdvanceDto? cashAdvance)
         => new(
             report.Id,
             report.Title,
@@ -396,6 +422,7 @@ public sealed class ExpenseReportAppService
             projectStatus,
             report.PaymentMethod,
             report.CashAdvanceId,
+            cashAdvance,
             report.TotalAmount.Amount,
             report.CreatedAt,
             report.SubmittedAt,

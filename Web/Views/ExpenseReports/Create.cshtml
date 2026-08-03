@@ -65,12 +65,15 @@
                 <option value="@cashAdvance.Id">
                     @cashAdvance.AdvancedAt.ToString("yyyy/MM/dd") -
                     @cashAdvance.PayeeName -
+                    @CashAdvanceUsageText(cashAdvance.Usage) -
                     @cashAdvance.Purpose -
                     @cashAdvance.Amount.ToString("N2")
                 </option>
             }
         </select>
-        <div class="form-text">只有付款方式為預支費用時需要選擇。</div>
+        <div class="form-text">
+            只有付款方式為預支費用時需要選擇。零用金（共用）要跟領款人領錢；個人預支只會列出你自己的。
+        </div>
         <span asp-validation-for="CashAdvanceId" class="text-danger"></span>
     </div>
 
@@ -80,4 +83,13 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+}
+
+@functions {
+    private static string CashAdvanceUsageText(CashAdvanceUsage usage) => usage switch
+    {
+        CashAdvanceUsage.Personal => "個人預支",
+        CashAdvanceUsage.PettyCash => "零用金（共用）",
+        _ => usage.ToString()
+    };
 }

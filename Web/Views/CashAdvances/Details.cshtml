@@ -2,6 +2,9 @@
 
 @{
     ViewData["Title"] = $"{Model.CashAdvance.PayeeName} 預支款";
+    // 領款人本人看得到這一頁（自己那筆錢的使用狀態），但結清作業仍然只有主管能做。
+    // 這幾行只決定按鈕畫不畫，真正的把關在 Controller 的 [Authorize] 與 Application Service。
+    var isManager = User.IsManager();
 }
 
 <div class="mb-3">
@@ -21,17 +24,30 @@
 <div class="d-flex align-items-start justify-content-between mb-4">
     <div>
         <h1 class="h3 mb-1">@Model.CashAdvance.PayeeName</h1>
+        <div class="text-muted">
+            用途類型：<span class="badge @UsageBadgeClass(Model.CashAdvance.Usage)">@UsageText(Model.CashAdvance.Usage)</span>
+        </div>
         <div class="text-muted">用途：@Model.CashAdvance.Purpose</div>
         <div class="text-muted">預支日期：@Model.CashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</div>
     </div>
     <div class="text-end">
         <div class="badge bg-secondary mb-2">@ReconciliationText(Model.CashAdvance.ReconciliationStatus)</div>
         <div class="fs-4">@Model.CashAdvance.Amount.ToString("N2")</div>
-        <a class="btn btn-sm btn-outline-secondary mt-2"
-           asp-action="Edit"
-           asp-route-id="@Model.CashAdvance.Id">修改預支款</a>
+        @if (isManager)
+        {
+            <a class="btn btn-sm btn-outline-secondary mt-2"
+               asp-action="Edit"
+               asp-route-id="@Model.CashAdvance.Id">修改預支款</a>
+        }
     </div>
 </div>
+
+@if (Model.CashAdvance.Usage == CashAdvanceUsage.PettyCash)
+{
+    <div class="alert alert-info">
+        這筆是零用金（共用）：由 @Model.CashAdvance.PayeeName 保管，所有人的報銷單都能引用它。
+    </div>
+}
 
 <div class="table-responsive mb-4">
     <table class="table table-sm align-middle">
@@ -87,7 +103,10 @@
                             <th>處理人</th>
                             <th>狀態</th>
                             <th>備註</th>
-                            <th class="text-end">操作</th>
+                            @if (isManager)
+                            {
+                                <th class="text-end">操作</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -114,31 +133,34 @@
                                     </div>
                                 }
                             </td>
-                            <td class="text-end">
-                                @if (record.CanEdit || record.CanVoid)
-                                {
-                                    <div class="btn-group btn-group-sm" role="group" aria-label="結清紀錄操作">
-                                        @if (record.CanEdit)
-                                        {
-                                            <a class="btn btn-outline-secondary"
-                                               asp-action="EditSettlement"
-                                               asp-route-id="@Model.CashAdvance.Id"
-                                               asp-route-settlementRecordId="@record.Id">修改</a>
-                                        }
-                                        @if (record.CanVoid)
-                                        {
-                                            <a class="btn btn-outline-danger"
-                                               asp-action="VoidSettlement"
-                                               asp-route-id="@Model.CashAdvance.Id"
-                                               asp-route-settlementRecordId="@record.Id">不採用</a>
-                                        }
-                                    </div>
-                                }
-                                else
-                                {
-                                    <span class="text-muted small">-</span>
-                                }
-                            </td>
+                            @if (isManager)
+                            {
+                                <td class="text-end">
+                                    @if (record.CanEdit || record.CanVoid)
+                                    {
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="結清紀錄操作">
+                                            @if (record.CanEdit)
+                                            {
+                                                <a class="btn btn-outline-secondary"
+                                                   asp-action="EditSettlement"
+                                                   asp-route-id="@Model.CashAdvance.Id"
+                                                   asp-route-settlementRecordId="@record.Id">修改</a>
+                                            }
+                                            @if (record.CanVoid)
+                                            {
+                                                <a class="btn btn-outline-danger"
+                                                   asp-action="VoidSettlement"
+                                                   asp-route-id="@Model.CashAdvance.Id"
+                                                   asp-route-settlementRecordId="@record.Id">不採用</a>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">-</span>
+                                    }
+                                </td>
+                            }
                         </tr>
                     }
                     </tbody>
@@ -148,7 +170,11 @@
     </div>
 
     <div class="col-lg-5">
-        @if (Model.CashAdvance.HasInProgressReports)
+        @if (!isManager)
+        {
+            <div class="alert alert-info">結清作業由主管處理，這裡只顯示這筆預支款目前的使用狀態。</div>
+        }
+        else if (Model.CashAdvance.HasInProgressReports)
         {
             <div class="alert alert-warning">仍有報銷單在流程中，暫不開放新增最終結清紀錄。</div>
         }
@@ -206,6 +232,17 @@
 }
 
 @functions {
+    private static string UsageText(CashAdvanceUsage usage)
+        => usage switch
+        {
+            CashAdvanceUsage.Personal => "個人預支",
+            CashAdvanceUsage.PettyCash => "零用金（共用）",
+            _ => usage.ToString()
+        };
+
+    private static string UsageBadgeClass(CashAdvanceUsage usage)
+        => usage == CashAdvanceUsage.PettyCash ? "bg-info text-dark" : "bg-light text-dark border";
+
     private static string ReconciliationText(CashAdvanceReconciliationStatus status)
         => status switch
         {

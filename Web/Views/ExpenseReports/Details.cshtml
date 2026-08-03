@@ -39,6 +39,10 @@
         <div class="text-muted">支出類型：@ExpenseTypeText(Model.Report.ExpenseType)</div>
         <div class="text-muted">專案：@DisplayProjectName(Model.Report)</div>
         <div class="text-muted">付款方式：@PaymentMethodText(Model.Report.PaymentMethod)</div>
+        @if (Model.Report.PaymentMethod == ExpensePaymentMethod.CashAdvance)
+        {
+            <div class="text-muted">對應預支款：@DisplayCashAdvance(Model.Report.CashAdvance)</div>
+        }
     </div>
     <div class="text-end">
         <div class="badge bg-secondary mb-2">@StatusText(Model.Report.Status)</div>
@@ -339,6 +343,20 @@
 
     private static string DisplayProjectName(ExpenseReportDetailDto report)
         => report.ExpenseType == ExpenseType.Project ? report.ProjectName ?? "(找不到專案)" : "-";
+
+    // 選得到卻看不到是 UI 缺口，所以這裡把「這張單花的是哪一筆錢」寫清楚。
+    // 只顯示識別得出來的欄位，核對金額仍留在預支款詳情頁（那頁只有主管與領款人進得去）。
+    private static string DisplayCashAdvance(ExpenseReportCashAdvanceDto? cashAdvance)
+        => cashAdvance is null
+            ? "(找不到預支款)"
+            : $"{cashAdvance.AdvancedAt:yyyy/MM/dd}．{cashAdvance.PayeeName}．{CashAdvanceUsageText(cashAdvance.Usage)}．{cashAdvance.Purpose}";
+
+    private static string CashAdvanceUsageText(CashAdvanceUsage usage) => usage switch
+    {
+        CashAdvanceUsage.Personal => "個人預支",
+        CashAdvanceUsage.PettyCash => "零用金（共用）",
+        _ => usage.ToString()
+    };
 
     private static string ReceiptTypeText(ExpenseReceiptType receiptType) => receiptType switch
     {

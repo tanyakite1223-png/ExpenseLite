@@ -380,7 +380,7 @@ public sealed class ExpenseReportsController : Controller
         CancellationToken cancellationToken)
     {
         form.ProjectOptions = await _projects.ListActiveOptionsAsync(cancellationToken);
-        form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
+        form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(User.ToCurrentUser(), cancellationToken);
         return form;
     }
 
@@ -389,7 +389,7 @@ public sealed class ExpenseReportsController : Controller
         CancellationToken cancellationToken)
     {
         form.ProjectOptions = await _projects.ListActiveOptionsAsync(cancellationToken);
-        form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(cancellationToken);
+        form.CashAdvanceOptions = await _cashAdvances.ListOpenOptionsAsync(User.ToCurrentUser(), cancellationToken);
 
         // 申請人在畫面上是唯讀文字、不會隨表單送回來，所以驗證失敗重新顯示時要自己補回去。
         if (string.IsNullOrWhiteSpace(form.ApplicantName))

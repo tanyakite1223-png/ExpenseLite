@@ -14,17 +14,21 @@ public sealed class CashAdvance
         Amount = Money.Zero;
     }
 
-    private CashAdvance(string payeeName, string purpose, DateOnly advancedAt, Money amount)
+    private CashAdvance(
+        Guid payeeUserId,
+        string payeeName,
+        CashAdvanceUsage usage,
+        string purpose,
+        DateOnly advancedAt,
+        Money amount)
     {
-        if (string.IsNullOrWhiteSpace(payeeName))
-        {
-            throw new DomainRuleViolationException("領款人不可空白。");
-        }
-
+        EnsurePayeeIsValid(payeeUserId, payeeName);
         ValidatePurposeAndAmount(purpose, amount);
 
         Id = Guid.NewGuid();
+        PayeeUserId = payeeUserId;
         PayeeName = payeeName.Trim();
+        Usage = usage;
         Purpose = purpose.Trim();
         AdvancedAt = advancedAt;
         Amount = amount;
@@ -33,7 +37,14 @@ public sealed class CashAdvance
 
     public Guid Id { get; private set; }
 
+    /// <summary>領款人的登入帳號 Id。舊資料的領款人只是手打字串、沒有帳號可對應，所以是 nullable。</summary>
+    public Guid? PayeeUserId { get; private set; }
+
+    /// <summary>領款當下的姓名快照。使用者日後改名時，這裡刻意不跟著變。</summary>
     public string PayeeName { get; private set; }
+
+    /// <summary>個人預支還是零用金（共用），決定誰的報銷單可以引用這筆錢。</summary>
+    public CashAdvanceUsage Usage { get; private set; }
 
     public string Purpose { get; private set; }
 
@@ -45,9 +56,19 @@ public sealed class CashAdvance
 
     public IReadOnlyCollection<CashAdvanceSettlementRecord> SettlementRecords => _settlementRecords.AsReadOnly();
 
-    public static CashAdvance Create(string payeeName, string purpose, DateOnly advancedAt, Money amount)
-        => new(payeeName, purpose, advancedAt, amount);
+    public static CashAdvance Create(
+        Guid payeeUserId,
+        string payeeName,
+        CashAdvanceUsage usage,
+        string purpose,
+        DateOnly advancedAt,
+        Money amount)
+        => new(payeeUserId, payeeName, usage, purpose, advancedAt, amount);
 
+    /// <summary>
+    /// 領款人與用途類型建立後不可修改，所以不在修改範圍內：
+    /// 換掉領款人等於改寫「這筆錢當初給了誰」，換掉用途類型會讓已經引用它的報銷單變成不該存在。
+    /// </summary>
     public void UpdateBasicInfo(string purpose, Money amount)
     {
         ValidatePurposeAndAmount(purpose, amount);
@@ -101,6 +122,19 @@ public sealed class CashAdvance
     {
         var record = GetSettlementRecord(settlementRecordId);
         record.MarkAsVoided(voidedByUserId, voidedByName, voidReason);
+    }
+
+    private static void EnsurePayeeIsValid(Guid payeeUserId, string payeeName)
+    {
+        if (payeeUserId == Guid.Empty)
+        {
+            throw new DomainRuleViolationException("領款人必須對應到一個登入帳號。");
+        }
+
+        if (string.IsNullOrWhiteSpace(payeeName))
+        {
+            throw new DomainRuleViolationException("領款人不可空白。");
+        }
     }
 
     private static void ValidatePurposeAndAmount(string purpose, Money amount)

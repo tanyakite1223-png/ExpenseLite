@@ -16,9 +16,20 @@ public sealed class CashAdvanceConfiguration : IEntityTypeConfiguration<CashAdva
             .HasColumnName("id")
             .ValueGeneratedNever();
 
+        builder.Property(x => x.PayeeUserId)
+            .HasColumnName("payee_user_id");
+
         builder.Property(x => x.PayeeName)
             .HasColumnName("payee_name")
             .HasMaxLength(50)
+            .IsRequired();
+
+        // 存字串而不是數字，比照 settlement_type：直接查 DB 就看得懂，
+        // 日後在 enum 中間插值也不會讓既有資料的意思跑掉。
+        builder.Property(x => x.Usage)
+            .HasColumnName("usage")
+            .HasConversion<string>()
+            .HasMaxLength(30)
             .IsRequired();
 
         builder.Property(x => x.Purpose)

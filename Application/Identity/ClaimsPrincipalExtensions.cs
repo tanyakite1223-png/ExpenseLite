@@ -33,6 +33,6 @@ public static class ClaimsPrincipalExtensions
         var userId = principal.GetUserId()
             ?? throw new InvalidOperationException("目前沒有登入者，無法取得操作人資訊。");
 
-        return new CurrentUser(userId, principal.GetDisplayName());
+        return new CurrentUser(userId, principal.GetDisplayName(), principal.IsManager());
     }
 }
