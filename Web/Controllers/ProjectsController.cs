@@ -18,13 +18,13 @@ public sealed class ProjectsController : Controller
 
     public async Task<IActionResult> Index(string? keyword, CancellationToken cancellationToken)
     {
-        var projects = await _projects.ListAsync(keyword, cancellationToken);
+        var projects = await _projects.ListAsync(User.ToCurrentUser(), keyword, cancellationToken);
         return View(projects);
     }
 
     public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
     {
-        var project = await _projects.GetDetailsAsync(id, cancellationToken);
+        var project = await _projects.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         if (project is null)
         {
             return NotFound();

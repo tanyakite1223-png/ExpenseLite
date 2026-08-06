@@ -25,26 +25,21 @@ public sealed class ExpenseReportAppService
         _projects = projects;
     }
 
-    public async Task<IReadOnlyList<ExpenseReportListItemDto>> ListAsync(CancellationToken cancellationToken = default)
-    {
-        var reports = await _reports.ListAsync(cancellationToken);
-        var projectNames = await GetProjectNamesAsync(cancellationToken);
-
-        return reports
-            .OrderByDescending(x => x.CreatedAt)
-            .Select(x => MapListItem(x, projectNames.GetValueOrDefault(x.ProjectId ?? Guid.Empty)))
-            .ToList();
-    }
-
     public async Task<ExpenseReportListPageDto> ListPageAsync(
         ExpenseReportListQuery query,
+        CurrentUser viewer,
         CancellationToken cancellationToken = default)
     {
         var reports = await _reports.ListAsync(cancellationToken);
         var projectNames = await GetProjectNamesAsync(cancellationToken);
         var normalizedKeyword = NormalizeKeyword(query.Keyword);
 
-        var items = reports
+        // 先過濾可見度再算總筆數，「還沒有報銷單」和「篩選條件沒中」才不會被別人的資料混淆。
+        var visible = reports
+            .Where(x => ExpenseReportVisibility.CanBeViewedBy(x, viewer))
+            .ToList();
+
+        var items = visible
             .Where(x => MatchesFilter(x, normalizedKeyword, query))
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => MapListItem(x, projectNames.GetValueOrDefault(x.ProjectId ?? Guid.Empty)))
@@ -55,17 +50,22 @@ public sealed class ExpenseReportAppService
             query.Status,
             query.ExpenseType,
             query.PaymentMethod,
-            reports.Count,
+            visible.Count,
             items);
     }
 
-    public async Task<ExpenseReportDetailDto?> GetDetailsAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ExpenseReportDetailDto?> GetDetailsAsync(
+        Guid id,
+        CurrentUser viewer,
+        CancellationToken cancellationToken = default)
     {
         var report = await _reports.GetByIdAsync(id, cancellationToken);
         if (report is null)
         {
             return null;
         }
+
+        ExpenseReportVisibility.EnsureCanBeViewedBy(report, viewer);
 
         var project = await GetProjectAsync(report.ProjectId, cancellationToken);
         var cashAdvance = await GetCashAdvanceSummaryAsync(report.CashAdvanceId, cancellationToken);

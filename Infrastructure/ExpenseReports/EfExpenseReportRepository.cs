@@ -42,6 +42,7 @@ public sealed class EfExpenseReportRepository : IExpenseReportRepository
     }
 
     public async Task<Dictionary<Guid, int>> CountUnfinishedProjectReportsAsync(
+        Guid? applicantUserId = null,
         CancellationToken cancellationToken = default)
     {
         return await _dbContext.ExpenseReports
@@ -50,7 +51,8 @@ public sealed class EfExpenseReportRepository : IExpenseReportRepository
                 x.ExpenseType == ExpenseType.Project &&
                 x.ProjectId != null &&
                 x.Status != ExpenseReportStatus.Approved &&
-                x.Status != ExpenseReportStatus.Rejected)
+                x.Status != ExpenseReportStatus.Rejected &&
+                (applicantUserId == null || x.ApplicantUserId == applicantUserId))
             .GroupBy(x => x.ProjectId!.Value)
             .Select(x => new { ProjectId = x.Key, Count = x.Count() })
             .ToDictionaryAsync(x => x.ProjectId, x => x.Count, cancellationToken);

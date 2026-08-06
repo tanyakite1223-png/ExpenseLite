@@ -1,4 +1,5 @@
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Projects;
 using ExpenseLite.Domain.Shared;
@@ -19,11 +20,18 @@ public sealed class ProjectAppService
     }
 
     public async Task<ProjectListPageDto> ListAsync(
+        CurrentUser viewer,
         string? keyword = null,
         CancellationToken cancellationToken = default)
     {
         var projects = await _projects.ListAsync(cancellationToken);
-        var unfinishedReportCounts = await _expenseReports.CountUnfinishedProjectReportsAsync(cancellationToken);
+
+        // 專案本身所有人都看得到，但「未完成報銷單」這個數字算的是報銷單，
+        // 所以跟著報銷單的可見度走：主管算全部，員工只算自己的。
+        // 否則員工會在列表看到 3、點進詳情卻只列得出 1 筆，兩個畫面互相打架。
+        var unfinishedReportCounts = await _expenseReports.CountUnfinishedProjectReportsAsync(
+            viewer.IsManager ? null : viewer.UserId,
+            cancellationToken);
         var normalizedKeyword = NormalizeKeyword(keyword);
 
         var items = projects
@@ -49,6 +57,7 @@ public sealed class ProjectAppService
 
     public async Task<ProjectDetailDto?> GetDetailsAsync(
         Guid id,
+        CurrentUser viewer,
         CancellationToken cancellationToken = default)
     {
         var project = await _projects.GetByIdAsync(id, cancellationToken);
@@ -58,7 +67,14 @@ public sealed class ProjectAppService
         }
 
         var reports = await _expenseReports.ListByProjectIdAsync(id, cancellationToken);
-        var reportItems = reports
+
+        // 專案詳情頁本身所有人都進得來，但「相關報銷單」是報銷單資料，
+        // 一樣照 ExpenseReportVisibility 過濾——不然員工從專案頁繞一圈就看得到別人的花費。
+        var visibleReports = reports
+            .Where(x => ExpenseReportVisibility.CanBeViewedBy(x, viewer))
+            .ToList();
+
+        var reportItems = visibleReports
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => MapExpenseReportListItem(x, project.Name))
             .ToList();
@@ -68,8 +84,8 @@ public sealed class ProjectAppService
             project.Name,
             project.CustomerName,
             project.Status,
-            CountUnfinishedReports(reports),
-            reports.Count,
+            CountUnfinishedReports(visibleReports),
+            visibleReports.Count,
             project.CreatedAt,
             reportItems);
     }

@@ -35,6 +35,7 @@ public sealed class ExpenseReportsController : Controller
     {
         var page = await _expenseReports.ListPageAsync(
             new ExpenseReportListQuery(keyword, status, expenseType, paymentMethod),
+            User.ToCurrentUser(),
             cancellationToken);
 
         return View(page);
@@ -77,7 +78,7 @@ public sealed class ExpenseReportsController : Controller
 
     public async Task<IActionResult> Details(Guid id, Guid? editDetailId, CancellationToken cancellationToken)
     {
-        var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
+        var report = await _expenseReports.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         if (report is null)
         {
             return NotFound();
@@ -100,7 +101,7 @@ public sealed class ExpenseReportsController : Controller
 
     public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
     {
-        var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
+        var report = await _expenseReports.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
         if (report is null)
         {
             return NotFound();
@@ -172,7 +173,7 @@ public sealed class ExpenseReportsController : Controller
     {
         if (!ModelState.IsValid)
         {
-            var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
+            var report = await _expenseReports.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
             if (report is null)
             {
                 return NotFound();
@@ -220,7 +221,7 @@ public sealed class ExpenseReportsController : Controller
 
         if (!ModelState.IsValid)
         {
-            var report = await _expenseReports.GetDetailsAsync(id, cancellationToken);
+            var report = await _expenseReports.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
             if (report is null)
             {
                 return NotFound();
@@ -394,7 +395,7 @@ public sealed class ExpenseReportsController : Controller
         // 申請人在畫面上是唯讀文字、不會隨表單送回來，所以驗證失敗重新顯示時要自己補回去。
         if (string.IsNullOrWhiteSpace(form.ApplicantName))
         {
-            var report = await _expenseReports.GetDetailsAsync(form.Id, cancellationToken);
+            var report = await _expenseReports.GetDetailsAsync(form.Id, User.ToCurrentUser(), cancellationToken);
             form.ApplicantName = report?.ApplicantName ?? string.Empty;
         }
 
