@@ -22,20 +22,8 @@
                 <option value="@payee.UserId">@payee.DisplayName</option>
             }
         </select>
-        <div class="form-text">領款人是拿到這筆錢的人，不一定是現在登入的你。</div>
+        <div class="form-text">領款人是拿到這筆錢的人，不一定是現在登入的你；只有他本人的報銷單能引用這筆預支款。</div>
         <span asp-validation-for="PayeeUserId" class="text-danger"></span>
-    </div>
-
-    <div class="mb-3">
-        <label asp-for="Usage" class="form-label">用途類型</label>
-        <select asp-for="Usage" class="form-select">
-            <option value="@CashAdvanceUsage.Personal">個人預支</option>
-            <option value="@CashAdvanceUsage.PettyCash">零用金（共用）</option>
-        </select>
-        <div class="form-text">
-            個人預支只有領款人本人的報銷單能引用；零用金由領款人保管，所有人的報銷單都能引用。
-        </div>
-        <span asp-validation-for="Usage" class="text-danger"></span>
     </div>
 
     <div class="mb-3">

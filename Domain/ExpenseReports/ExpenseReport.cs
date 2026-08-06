@@ -246,14 +246,15 @@ public sealed class ExpenseReport
             throw new DomainRuleViolationException("一般支出報銷單不可連到專案。");
         }
 
-        if (paymentMethod == ExpensePaymentMethod.CashAdvance && cashAdvanceId is null)
+        // 只有個人預支要綁預支款；員工墊款與零用金支付的錢都不是預先撥給某個人的，所以都不綁。
+        if (paymentMethod == ExpensePaymentMethod.PersonalAdvance && cashAdvanceId is null)
         {
-            throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
+            throw new DomainRuleViolationException("個人預支報銷單必須選擇對應的預支款。");
         }
 
-        if (paymentMethod == ExpensePaymentMethod.EmployeePaid && cashAdvanceId is not null)
+        if (paymentMethod != ExpensePaymentMethod.PersonalAdvance && cashAdvanceId is not null)
         {
-            throw new DomainRuleViolationException("員工墊款報銷單不可連到預支款。");
+            throw new DomainRuleViolationException("只有個人預支報銷單可以連到預支款。");
         }
     }
 

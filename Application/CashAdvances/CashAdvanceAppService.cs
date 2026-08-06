@@ -86,7 +86,6 @@ public sealed class CashAdvanceAppService
         var cashAdvance = CashAdvance.Create(
             payee.UserId,
             payee.DisplayName,
-            command.Usage,
             command.Purpose,
             command.AdvancedAt,
             Money.From(command.Amount));
@@ -252,10 +251,9 @@ public sealed class CashAdvanceAppService
     private static bool CanBeViewedBy(CashAdvance cashAdvance, CurrentUser viewer)
         => viewer.IsManager || cashAdvance.PayeeUserId == viewer.UserId;
 
-    /// <summary>零用金是共用的，誰都能開報銷單引用；個人預支只有領款人本人能引用。</summary>
+    /// <summary>預支款是公司先把錢給某個人，所以只有領款人本人的報銷單能引用——主管也不例外。</summary>
     private static bool CanBeReferencedBy(CashAdvance cashAdvance, CurrentUser viewer)
-        => cashAdvance.Usage == CashAdvanceUsage.PettyCash ||
-           cashAdvance.PayeeUserId == viewer.UserId;
+        => cashAdvance.PayeeUserId == viewer.UserId;
 
     private static CashAdvanceSettlementRecord GetExistingSettlementRecord(
         CashAdvance cashAdvance,
@@ -312,7 +310,7 @@ public sealed class CashAdvanceAppService
 
         return reports
             .Where(x =>
-                x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+                x.PaymentMethod == ExpensePaymentMethod.PersonalAdvance &&
                 x.CashAdvanceId is not null &&
                 x.Status == ExpenseReportStatus.Approved)
             .GroupBy(x => x.CashAdvanceId!.Value)
@@ -328,7 +326,7 @@ public sealed class CashAdvanceAppService
 
         return reports
             .Where(x =>
-                x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+                x.PaymentMethod == ExpensePaymentMethod.PersonalAdvance &&
                 x.CashAdvanceId is not null &&
                 IsInProgress(x.Status))
             .Select(x => x.CashAdvanceId!.Value)
@@ -342,7 +340,7 @@ public sealed class CashAdvanceAppService
 
         return reports
             .Where(x =>
-                x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+                x.PaymentMethod == ExpensePaymentMethod.PersonalAdvance &&
                 x.CashAdvanceId is not null)
             .Select(x => x.CashAdvanceId!.Value)
             .ToHashSet();
@@ -355,7 +353,7 @@ public sealed class CashAdvanceAppService
         var reports = await _reports.ListAsync(cancellationToken);
 
         return reports.Any(x =>
-            x.PaymentMethod == ExpensePaymentMethod.CashAdvance &&
+            x.PaymentMethod == ExpensePaymentMethod.PersonalAdvance &&
             x.CashAdvanceId == cashAdvanceId);
     }
 
@@ -395,7 +393,6 @@ public sealed class CashAdvanceAppService
             cashAdvance.Id,
             cashAdvance.PayeeUserId,
             cashAdvance.PayeeName,
-            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt,
             cashAdvance.Amount.Amount,
@@ -416,7 +413,6 @@ public sealed class CashAdvanceAppService
         => new(
             cashAdvance.Id,
             cashAdvance.PayeeName,
-            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt,
             cashAdvance.Amount.Amount,
@@ -435,7 +431,6 @@ public sealed class CashAdvanceAppService
             cashAdvance.Id,
             cashAdvance.PayeeUserId,
             cashAdvance.PayeeName,
-            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt,
             cashAdvance.Amount.Amount,

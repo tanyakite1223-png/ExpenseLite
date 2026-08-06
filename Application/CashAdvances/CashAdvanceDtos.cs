@@ -14,7 +14,6 @@ public sealed record CashAdvanceListItemDto(
     Guid Id,
     Guid? PayeeUserId,
     string PayeeName,
-    CashAdvanceUsage Usage,
     string Purpose,
     DateOnly AdvancedAt,
     decimal Amount,
@@ -41,7 +40,6 @@ public sealed record CashAdvanceListPageDto(
 public sealed record CashAdvanceOptionDto(
     Guid Id,
     string PayeeName,
-    CashAdvanceUsage Usage,
     string Purpose,
     DateOnly AdvancedAt,
     decimal Amount,
@@ -51,7 +49,6 @@ public sealed record CashAdvanceSettlementDetailDto(
     Guid Id,
     Guid? PayeeUserId,
     string PayeeName,
-    CashAdvanceUsage Usage,
     string Purpose,
     DateOnly AdvancedAt,
     decimal Amount,

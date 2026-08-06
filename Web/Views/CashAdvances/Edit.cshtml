@@ -18,10 +18,6 @@
                 <td>@Model.CashAdvance.PayeeName</td>
             </tr>
             <tr>
-                <th>用途類型</th>
-                <td>@UsageText(Model.CashAdvance.Usage)</td>
-            </tr>
-            <tr>
                 <th>預支日期</th>
                 <td>@Model.CashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</td>
             </tr>
@@ -60,15 +56,4 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-}
-
-@functions {
-    // 領款人與用途類型建立後不可修改，所以在這裡只是唯讀顯示。
-    private static string UsageText(CashAdvanceUsage usage)
-        => usage switch
-        {
-            CashAdvanceUsage.Personal => "個人預支",
-            CashAdvanceUsage.PettyCash => "零用金（共用）",
-            _ => usage.ToString()
-        };
 }

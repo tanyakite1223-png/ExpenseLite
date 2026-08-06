@@ -17,7 +17,6 @@ public sealed class CashAdvance
     private CashAdvance(
         Guid payeeUserId,
         string payeeName,
-        CashAdvanceUsage usage,
         string purpose,
         DateOnly advancedAt,
         Money amount)
@@ -28,7 +27,6 @@ public sealed class CashAdvance
         Id = Guid.NewGuid();
         PayeeUserId = payeeUserId;
         PayeeName = payeeName.Trim();
-        Usage = usage;
         Purpose = purpose.Trim();
         AdvancedAt = advancedAt;
         Amount = amount;
@@ -43,9 +41,6 @@ public sealed class CashAdvance
     /// <summary>領款當下的姓名快照。使用者日後改名時，這裡刻意不跟著變。</summary>
     public string PayeeName { get; private set; }
 
-    /// <summary>個人預支還是零用金（共用），決定誰的報銷單可以引用這筆錢。</summary>
-    public CashAdvanceUsage Usage { get; private set; }
-
     public string Purpose { get; private set; }
 
     public DateOnly AdvancedAt { get; private set; }
@@ -59,15 +54,14 @@ public sealed class CashAdvance
     public static CashAdvance Create(
         Guid payeeUserId,
         string payeeName,
-        CashAdvanceUsage usage,
         string purpose,
         DateOnly advancedAt,
         Money amount)
-        => new(payeeUserId, payeeName, usage, purpose, advancedAt, amount);
+        => new(payeeUserId, payeeName, purpose, advancedAt, amount);
 
     /// <summary>
-    /// 領款人與用途類型建立後不可修改，所以不在修改範圍內：
-    /// 換掉領款人等於改寫「這筆錢當初給了誰」，換掉用途類型會讓已經引用它的報銷單變成不該存在。
+    /// 領款人建立後不可修改，所以不在修改範圍內：
+    /// 換掉領款人等於改寫「這筆錢當初給了誰」。
     /// </summary>
     public void UpdateBasicInfo(string purpose, Money amount)
     {

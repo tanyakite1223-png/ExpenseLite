@@ -39,9 +39,14 @@
         <div class="text-muted">支出類型：@ExpenseTypeText(Model.Report.ExpenseType)</div>
         <div class="text-muted">專案：@DisplayProjectName(Model.Report)</div>
         <div class="text-muted">付款方式：@PaymentMethodText(Model.Report.PaymentMethod)</div>
-        @if (Model.Report.PaymentMethod == ExpensePaymentMethod.CashAdvance)
+        @if (Model.Report.PaymentMethod == ExpensePaymentMethod.PersonalAdvance)
         {
             <div class="text-muted">對應預支款：@DisplayCashAdvance(Model.Report.CashAdvance)</div>
+        }
+        else if (Model.Report.PaymentMethod == ExpensePaymentMethod.PettyCash)
+        {
+            @* 零用金支付的錢當場就付掉了，這句是要讓主管審核時看得出來不用再付款。 *@
+            <div class="text-muted">這筆是從零用金支付的，公司不需要再付款給申請人。</div>
         }
     </div>
     <div class="text-end">
@@ -330,7 +335,8 @@
     private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
     {
         ExpensePaymentMethod.EmployeePaid => "員工墊款",
-        ExpensePaymentMethod.CashAdvance => "預支費用",
+        ExpensePaymentMethod.PersonalAdvance => "個人預支",
+        ExpensePaymentMethod.PettyCash => "零用金支付",
         _ => paymentMethod.ToString()
     };
 
@@ -349,14 +355,7 @@
     private static string DisplayCashAdvance(ExpenseReportCashAdvanceDto? cashAdvance)
         => cashAdvance is null
             ? "(找不到預支款)"
-            : $"{cashAdvance.AdvancedAt:yyyy/MM/dd}．{cashAdvance.PayeeName}．{CashAdvanceUsageText(cashAdvance.Usage)}．{cashAdvance.Purpose}";
-
-    private static string CashAdvanceUsageText(CashAdvanceUsage usage) => usage switch
-    {
-        CashAdvanceUsage.Personal => "個人預支",
-        CashAdvanceUsage.PettyCash => "零用金（共用）",
-        _ => usage.ToString()
-    };
+            : $"{cashAdvance.AdvancedAt:yyyy/MM/dd}．{cashAdvance.PayeeName}．{cashAdvance.Purpose}";
 
     private static string ReceiptTypeText(ExpenseReceiptType receiptType) => receiptType switch
     {

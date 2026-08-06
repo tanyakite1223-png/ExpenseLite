@@ -1,5 +1,4 @@
 using ExpenseLite.Application.Identity;
-using ExpenseLite.Domain.CashAdvances;
 
 namespace ExpenseLite.Application.CashAdvances;
 
@@ -9,7 +8,6 @@ namespace ExpenseLite.Application.CashAdvances;
 /// </summary>
 public sealed record CreateCashAdvanceCommand(
     Guid PayeeUserId,
-    CashAdvanceUsage Usage,
     string Purpose,
     DateOnly AdvancedAt,
     decimal Amount);

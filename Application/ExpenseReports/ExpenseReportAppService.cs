@@ -261,14 +261,14 @@ public sealed class ExpenseReportAppService
         Guid? cashAdvanceId,
         CancellationToken cancellationToken)
     {
-        if (paymentMethod != ExpensePaymentMethod.CashAdvance)
+        if (paymentMethod != ExpensePaymentMethod.PersonalAdvance)
         {
             return;
         }
 
         if (cashAdvanceId is null)
         {
-            throw new DomainRuleViolationException("預支費用報銷單必須選擇對應的預支款。");
+            throw new DomainRuleViolationException("個人預支報銷單必須選擇對應的預支款。");
         }
 
         var cashAdvance = await _cashAdvances.GetByIdAsync(cashAdvanceId.Value, cancellationToken);
@@ -319,7 +319,6 @@ public sealed class ExpenseReportAppService
         return new ExpenseReportCashAdvanceDto(
             cashAdvance.Id,
             cashAdvance.PayeeName,
-            cashAdvance.Usage,
             cashAdvance.Purpose,
             cashAdvance.AdvancedAt);
     }

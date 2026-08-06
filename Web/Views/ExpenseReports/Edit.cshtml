@@ -52,8 +52,12 @@
         <label asp-for="PaymentMethod" class="form-label">付款方式</label>
         <select asp-for="PaymentMethod" class="form-select">
             <option value="@ExpensePaymentMethod.EmployeePaid">員工墊款</option>
-            <option value="@ExpensePaymentMethod.CashAdvance">預支費用</option>
+            <option value="@ExpensePaymentMethod.PersonalAdvance">個人預支</option>
+            <option value="@ExpensePaymentMethod.PettyCash">零用金支付</option>
         </select>
+        <div class="form-text">
+            這筆錢從哪來：員工墊款是你自己先付、公司要還你；個人預支是用公司先給你的錢；零用金支付是從抽屜拿現金付的，公司不用再付你。
+        </div>
         <span asp-validation-for="PaymentMethod" class="text-danger"></span>
     </div>
 
@@ -66,14 +70,13 @@
                 <option value="@cashAdvance.Id">
                     @cashAdvance.AdvancedAt.ToString("yyyy/MM/dd") -
                     @cashAdvance.PayeeName -
-                    @CashAdvanceUsageText(cashAdvance.Usage) -
                     @cashAdvance.Purpose -
                     @cashAdvance.Amount.ToString("N2")
                 </option>
             }
         </select>
         <div class="form-text">
-            只有付款方式為預支費用時需要選擇。零用金（共用）要跟領款人領錢；個人預支只會列出你自己的。
+            只有付款方式為個人預支時需要選擇，這裡只會列出領給你自己的預支款。
         </div>
         <span asp-validation-for="CashAdvanceId" class="text-danger"></span>
     </div>
@@ -84,13 +87,4 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-}
-
-@functions {
-    private static string CashAdvanceUsageText(CashAdvanceUsage usage) => usage switch
-    {
-        CashAdvanceUsage.Personal => "個人預支",
-        CashAdvanceUsage.PettyCash => "零用金（共用）",
-        _ => usage.ToString()
-    };
 }

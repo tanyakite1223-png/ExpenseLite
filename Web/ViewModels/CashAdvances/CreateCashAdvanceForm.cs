@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using ExpenseLite.Application.Identity;
-using ExpenseLite.Domain.CashAdvances;
 
 namespace ExpenseLite.Web.ViewModels.CashAdvances;
 
@@ -12,13 +11,6 @@ public sealed class CreateCashAdvanceForm
     /// </summary>
     [Required(ErrorMessage = "請選擇領款人")]
     public Guid? PayeeUserId { get; set; }
-
-    /// <summary>
-    /// 預設個人預支：預設選限制緊的一方，忘了改的後果比較小。
-    /// 反過來預設零用金，忘了改就是「本該專屬某人的錢，全公司都能報」。
-    /// </summary>
-    [Required(ErrorMessage = "請選擇用途類型")]
-    public CashAdvanceUsage Usage { get; set; } = CashAdvanceUsage.Personal;
 
     [Required(ErrorMessage = "請輸入預支用途")]
     [StringLength(200, ErrorMessage = "預支用途最多 200 個字")]

@@ -24,9 +24,6 @@
 <div class="d-flex align-items-start justify-content-between mb-4">
     <div>
         <h1 class="h3 mb-1">@Model.CashAdvance.PayeeName</h1>
-        <div class="text-muted">
-            用途類型：<span class="badge @UsageBadgeClass(Model.CashAdvance.Usage)">@UsageText(Model.CashAdvance.Usage)</span>
-        </div>
         <div class="text-muted">用途：@Model.CashAdvance.Purpose</div>
         <div class="text-muted">預支日期：@Model.CashAdvance.AdvancedAt.ToString("yyyy/MM/dd")</div>
     </div>
@@ -41,13 +38,6 @@
         }
     </div>
 </div>
-
-@if (Model.CashAdvance.Usage == CashAdvanceUsage.PettyCash)
-{
-    <div class="alert alert-info">
-        這筆是零用金（共用）：由 @Model.CashAdvance.PayeeName 保管，所有人的報銷單都能引用它。
-    </div>
-}
 
 <div class="table-responsive mb-4">
     <table class="table table-sm align-middle">
@@ -232,17 +222,6 @@
 }
 
 @functions {
-    private static string UsageText(CashAdvanceUsage usage)
-        => usage switch
-        {
-            CashAdvanceUsage.Personal => "個人預支",
-            CashAdvanceUsage.PettyCash => "零用金（共用）",
-            _ => usage.ToString()
-        };
-
-    private static string UsageBadgeClass(CashAdvanceUsage usage)
-        => usage == CashAdvanceUsage.PettyCash ? "bg-info text-dark" : "bg-light text-dark border";
-
     private static string ReconciliationText(CashAdvanceReconciliationStatus status)
         => status switch
         {

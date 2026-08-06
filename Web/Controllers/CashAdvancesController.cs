@@ -87,22 +87,12 @@ public sealed class CashAdvancesController : Controller
             await _cashAdvances.CreateAsync(
                 new CreateCashAdvanceCommand(
                     form.PayeeUserId!.Value,
-                    form.Usage,
                     form.Purpose,
                     form.AdvancedAt,
                     form.Amount),
                 cancellationToken);
 
-            if (form.Usage == CashAdvanceUsage.PettyCash)
-            {
-                // 這不是「成功」訊息而是提醒：選錯用途類型的後果是別人也能把這筆錢報掉，
-                // 所以要在建立當下就講明白，而不是等到有人誤用才發現。
-                TempData["WarningMessage"] = "這筆是零用金（共用），所有人的報銷單都能引用它。";
-            }
-            else
-            {
-                TempData["SuccessMessage"] = "預支款已建立。";
-            }
+            TempData["SuccessMessage"] = "預支款已建立。";
 
             return RedirectToAction(nameof(Index));
         }

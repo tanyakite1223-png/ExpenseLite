@@ -59,7 +59,6 @@ public sealed record ExpenseReportDetailDto(
 public sealed record ExpenseReportCashAdvanceDto(
     Guid Id,
     string PayeeName,
-    CashAdvanceUsage Usage,
     string Purpose,
     DateOnly AdvancedAt);
 
