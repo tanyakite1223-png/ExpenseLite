@@ -21,7 +21,7 @@ public sealed class IdentityUserDirectory : IUserDirectory
         CancellationToken cancellationToken = default)
     {
         var users = await _userManager.Users
-            .Where(x => x.IsActive)
+            .Where(x => x.Status == UserAccountStatus.Active)
             .OrderBy(x => x.DisplayName)
             .Select(x => new UserOptionDto(x.Id, x.DisplayName))
             .ToListAsync(cancellationToken);
@@ -30,7 +30,7 @@ public sealed class IdentityUserDirectory : IUserDirectory
     }
 
     /// <summary>
-    /// 刻意不過濾 IsActive：這是用來查姓名快照與顯示既有資料的，
+    /// 刻意不過濾狀態：這是用來查姓名快照與顯示既有資料的，
     /// 帳號被停用之後，歷史紀錄上的人還是得查得到。
     /// </summary>
     public async Task<UserOptionDto?> FindByIdAsync(

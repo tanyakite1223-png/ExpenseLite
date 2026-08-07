@@ -1,0 +1,143 @@
+@model IReadOnlyList<UserAccountDto>
+
+@{
+    ViewData["Title"] = "使用者";
+    var currentUserId = User.GetUserId();
+    var pendingCount = Model.Count(x => x.Status == UserAccountStatus.Pending);
+}
+
+<div class="mb-3">
+    <h1 class="h3 mb-1">使用者</h1>
+    <div class="text-muted">員工自行註冊後會停在「尚待啟用」，由主管在這裡啟用。</div>
+</div>
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (pendingCount > 0)
+{
+    <div class="alert alert-warning">有 @pendingCount 個帳號尚待啟用。</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>姓名</th>
+                <th>帳號</th>
+                <th>Email</th>
+                <th>角色</th>
+                <th>狀態</th>
+                <th>最後登入</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var account in Model)
+        {
+            var isSelf = currentUserId == account.UserId;
+            <tr>
+                <td>
+                    @account.DisplayName
+                    @if (isSelf)
+                    {
+                        <span class="badge bg-light text-dark border ms-1">你自己</span>
+                    }
+                    @if (account.IsProtected)
+                    {
+                        <span class="badge bg-danger ms-1">緊急存取帳號</span>
+                    }
+                </td>
+                <td>@account.UserName</td>
+                <td class="text-muted small">@account.Email</td>
+                <td>@ExpenseLiteRoles.GetDisplayName(account.Role)</td>
+                <td><span class="badge @StatusBadgeClass(account.Status)">@StatusText(account.Status)</span></td>
+                <td class="small @(account.IsProtected ? "fw-bold" : "text-muted")">@LastSignInText(account.LastSignedInAt)</td>
+                <td class="text-end">
+                    @if (account.IsProtected)
+                    {
+                        <span class="text-muted small me-2">不可停用 / 降級</span>
+                    }
+                    else if (account.Status == UserAccountStatus.Active)
+                    {
+                        <form asp-action="Disable" asp-route-id="@account.UserId" method="post" class="d-inline"
+                              onsubmit="return confirm('確定要停用 @account.DisplayName 的帳號嗎？停用後將無法登入，既有的報銷紀錄不受影響。');">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">停用</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form asp-action="Activate" asp-route-id="@account.UserId" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">啟用</button>
+                        </form>
+                    }
+
+                    @if (account.IsProtected)
+                    {
+                        @* 緊急存取帳號必須一直是啟用中的主管，所以停用與改角色的按鈕都不畫。
+                           真正的把關在 UserAccountAppService，這裡只是不要給出點得下去卻一定失敗的按鈕。 *@
+                    }
+                    else if (account.Role == ExpenseLiteRoles.Manager)
+                    {
+                        <form asp-action="SetRole" asp-route-id="@account.UserId" method="post" class="d-inline"
+                              onsubmit="return confirm('確定要把 @account.DisplayName 改成員工嗎？他將無法再核准報銷單。');">
+                            <input type="hidden" name="role" value="@ExpenseLiteRoles.Employee" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">改為員工</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form asp-action="SetRole" asp-route-id="@account.UserId" method="post" class="d-inline"
+                              onsubmit="return confirm('確定要把 @account.DisplayName 改成主管嗎？他將可以核准報銷單、管理預支款與使用者。');">
+                            <input type="hidden" name="role" value="@ExpenseLiteRoles.Manager" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">改為主管</button>
+                        </form>
+                    }
+
+                    <a class="btn btn-sm btn-outline-secondary"
+                       asp-action="ResetPassword"
+                       asp-route-id="@account.UserId">重設密碼</a>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="text-muted small">
+    <div>改角色或停用之後，對方目前開著的瀏覽器最慢會在 30 分鐘內失效（Identity 重新驗證登入 cookie 的間隔）。</div>
+    <div>
+        <strong>緊急存取帳號</strong>只在沒有其他主管進得來時使用，平常不該有登入紀錄。
+        上面的「最後登入」如果出現你沒有印象的時間，請立即用「重設密碼」換掉它。
+    </div>
+</div>
+
+@functions {
+    private static string LastSignInText(DateTime? lastSignedInAt)
+        => lastSignedInAt is null
+            ? "從未登入"
+            : lastSignedInAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+
+    private static string StatusText(UserAccountStatus status) => status switch
+    {
+        UserAccountStatus.Pending => "尚待啟用",
+        UserAccountStatus.Active => "啟用中",
+        UserAccountStatus.Disabled => "已停用",
+        _ => status.ToString()
+    };
+
+    private static string StatusBadgeClass(UserAccountStatus status) => status switch
+    {
+        UserAccountStatus.Pending => "bg-warning text-dark",
+        UserAccountStatus.Active => "bg-success",
+        UserAccountStatus.Disabled => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+}

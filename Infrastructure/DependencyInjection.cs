@@ -45,12 +45,14 @@ public static class DependencyInjection
             })
             .AddEntityFrameworkStores<ExpenseLiteDbContext>()
             .AddClaimsPrincipalFactory<ApplicationUserClaimsPrincipalFactory>()
+            .AddErrorDescriber<ChineseIdentityErrorDescriber>()
             .AddDefaultTokenProviders();
 
         services.AddScoped<IExpenseReportRepository, EfExpenseReportRepository>();
         services.AddScoped<ICashAdvanceRepository, EfCashAdvanceRepository>();
         services.AddScoped<IProjectRepository, EfProjectRepository>();
         services.AddScoped<IUserDirectory, IdentityUserDirectory>();
+        services.AddScoped<IUserAccountStore, IdentityUserAccountStore>();
 
         return services;
     }

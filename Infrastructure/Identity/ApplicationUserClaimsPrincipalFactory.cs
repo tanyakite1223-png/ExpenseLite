@@ -26,6 +26,11 @@ public sealed class ApplicationUserClaimsPrincipalFactory
 
         identity.AddClaim(new Claim(ExpenseLiteClaimTypes.DisplayName, user.DisplayName));
 
+        if (user.IsProtected)
+        {
+            identity.AddClaim(new Claim(ExpenseLiteClaimTypes.ProtectedAccount, "true"));
+        }
+
         return identity;
     }
 }

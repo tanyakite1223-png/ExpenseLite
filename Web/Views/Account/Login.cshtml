@@ -9,6 +9,11 @@
     <div class="col-md-5">
         <h1 class="h3 mb-4">登入 ExpenseLite</h1>
 
+        @if (TempData["SuccessMessage"] is string successMessage)
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
         <form asp-action="Login" asp-route-returnUrl="@returnUrl" method="post">
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -31,6 +36,10 @@
 
             <button type="submit" class="btn btn-primary w-100">登入</button>
         </form>
+
+        <div class="text-center mt-3">
+            <a asp-action="Register">還沒有帳號？註冊一個</a>
+        </div>
     </div>
 </div>
 

@@ -30,8 +30,15 @@ internal static class IdentityModelConfiguration
                 .HasMaxLength(50)
                 .IsRequired();
 
-            builder.Property(x => x.IsActive)
+            builder.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
                 .IsRequired();
+
+            builder.Property(x => x.IsProtected)
+                .IsRequired();
+
+            builder.Property(x => x.LastSignedInAt);
         });
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

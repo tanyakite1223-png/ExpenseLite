@@ -1,5 +1,6 @@
 using ExpenseLite.Application.CashAdvances;
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure;
 using ExpenseLite.Infrastructure.Identity;
@@ -25,6 +26,7 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.AddScoped<ExpenseReportAppService>();
 builder.Services.AddScoped<CashAdvanceAppService>();
 builder.Services.AddScoped<ProjectAppService>();
+builder.Services.AddScoped<UserAccountAppService>();
 builder.Services.AddExpenseLiteInfrastructure(builder.Configuration);
 
 // 全站預設都要登入才能看，例外要自己標 [AllowAnonymous]（登入頁、錯誤頁）。
@@ -46,7 +48,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 var app = builder.Build();
 
-await IdentitySeeder.SeedAsync(app.Services);
+await IdentityBootstrapper.BootstrapAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

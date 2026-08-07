@@ -33,6 +33,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="CashAdvances" asp-action="Index">預支款</a>
                         </li>
+                        @if (User.IsManager())
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Users" asp-action="Index">使用者</a>
+                            </li>
+                        }
                     </ul>
                     <partial name="_LoginPartial" />
                 </div>
@@ -40,6 +46,17 @@
         </nav>
     </header>
     <div class="container">
+        @* 緊急存取帳號（break-glass）不該被拿來做日常工作，每一頁都提醒一次。 *@
+        @if (User.IsProtectedAccount())
+        {
+            <div class="alert alert-danger d-flex align-items-center" role="alert">
+                <strong class="me-2">緊急存取帳號</strong>
+                <span>
+                    你正在使用系統的緊急存取帳號。它只用於「沒有其他主管進得來」的情況；
+                    日常作業請登出後改用自己的帳號。
+                </span>
+            </div>
+        }
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
