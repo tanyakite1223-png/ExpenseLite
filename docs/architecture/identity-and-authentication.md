@@ -2,7 +2,7 @@
 
 本專案用 ASP.NET Core Identity 做登入與角色。這篇說明「東西放在哪一層、為什麼」，不是 Identity 的通用教學。
 
-這篇的範圍是**認證**（authentication，「你是誰」）以及怎麼把操作者記進資料。**授權**（authorization，「你能不能做」）的落點在〈[授權規則放在哪一層](authorization.md)〉。
+這篇的範圍是**認證**（authentication，「你是誰」）以及怎麼把操作者記進資料。**授權**（authorization，「你能不能做」）的落點在〈[授權規則放在哪一層](authorization.md)〉；**帳號本身**怎麼產生與維護（註冊、啟用、停用、改密碼）在〈[帳號生命週期與使用者管理](user-accounts.md)〉。
 
 ## 為什麼用 Identity 而不是自己做
 
@@ -17,9 +17,10 @@
 | 東西 | 放哪 | 為什麼 |
 | --- | --- | --- |
 | `ApplicationUser` | `Infrastructure/Identity` | 它繼承 `IdentityUser<Guid>`，直接依賴框架。放進 Domain 會讓 Domain 依賴 EF Core 與 ASP.NET Core，違反「Domain 不依賴任何人」。 |
-| `ExpenseLiteRoles`（角色常數） | `Application/Identity` | 「員工 / 主管」是業務概念，不是 Identity 的實作細節。Web 的 `[Authorize]` 與 Infrastructure 的種子資料都要用到，放 Application 兩邊都能取用。 |
-| `ApplicationUserClaimsPrincipalFactory` | `Infrastructure/Identity` | 它是 Identity 的擴充點，屬於框架整合。 |
-| 登入頁、`AccountController` | `Web` | 純粹是 HTTP 與畫面。 |
+| `ExpenseLiteRoles`（角色常數） | `Application/Identity` | 「員工 / 主管」是業務概念，不是 Identity 的實作細節。Web 的 `[Authorize]` 與 Infrastructure 的 bootstrap 都要用到，放 Application 兩邊都能取用。 |
+| `UserAccountStatus`（帳號狀態） | `Application/Identity` | 同上，「這個帳號能不能用」是業務概念。詳見〈[帳號生命週期與使用者管理](user-accounts.md)〉。 |
+| `ApplicationUserClaimsPrincipalFactory`、`ChineseIdentityErrorDescriber` | `Infrastructure/Identity` | 都是 Identity 的擴充點，屬於框架整合。 |
+| 登入頁、`AccountController` | `Web` | 純粹是 HTTP 與畫面。發登入 cookie 也在這裡——那本來就是 Web 的事。 |
 
 因為 Domain 不認識 `ApplicationUser`，報銷單之類的 aggregate 要記「是誰做的」時，**只存 `Guid` 形式的 UserId**，不持有使用者物件。這跟 §4.4「跨 aggregate 一律用 ID 參照」是同一個規則：使用者是另一個獨立的東西，不該被抓進報銷單的邊界裡。
 
@@ -73,7 +74,9 @@ public interface IUserDirectory
 
 `FindByIdAsync` 不只是為了查一個人，它撐住了一條安全規則：**建立預支款的命令只帶 `PayeeUserId`，不帶姓名。** 姓名快照由 Application 自己查出來，不接受 Web 層送進來的字串——否則有人竄改表單就能讓紀錄上的名字跟帳號對不上。
 
-兩個方法的 `IsActive` 過濾也刻意不同：`ListSelectableAsync` 只列啟用中的帳號（不該把錢指派給離職的人），`FindByIdAsync` 不過濾（帳號停用之後，歷史紀錄上的人還是得查得到）。
+兩個方法的狀態過濾也刻意不同：`ListSelectableAsync` 只列 `Active` 的帳號（不該把錢指派給尚待啟用或離職的人），`FindByIdAsync` 不過濾（帳號停用之後，歷史紀錄上的人還是得查得到）。
+
+要**改**帳號（啟用、停用、換角色、換密碼）走的是另一個介面 `IUserAccountStore`，刻意不跟這個唯讀的目錄混在一起，理由見〈[帳號生命週期與使用者管理](user-accounts.md)〉。
 
 ## 資料表命名
 
@@ -102,6 +105,6 @@ builder.Services.AddAuthorizationBuilder()
 
 ## 初始密碼不進版控
 
-初始帳號的密碼從設定值 `Identity:SeedPassword` 讀（實務上放在 user secrets），沒設就跳過建立帳號並留下 log。帳號名稱與 email 寫在 `IdentitySeeder` 裡是可以的——那不是機密；密碼不行。
+第一個主管帳號的密碼從設定值 `Identity:SeedPassword` 讀（實務上放在 user secrets），沒設就跳過建立帳號並留下 log。帳號名稱與 email 寫在 `IdentityBootstrapper` 裡是可以的——那不是機密；密碼不行。
 
 同樣的原則也適用於連線字串：repo 裡不放任何真實密碼。
