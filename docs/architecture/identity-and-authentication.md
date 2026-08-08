@@ -74,7 +74,7 @@ public interface IUserDirectory
 
 `FindByIdAsync` 不只是為了查一個人，它撐住了一條安全規則：**建立預支款的命令只帶 `PayeeUserId`，不帶姓名。** 姓名快照由 Application 自己查出來，不接受 Web 層送進來的字串——否則有人竄改表單就能讓紀錄上的名字跟帳號對不上。
 
-兩個方法的狀態過濾也刻意不同：`ListSelectableAsync` 只列 `Active` 的帳號（不該把錢指派給尚待啟用或離職的人），`FindByIdAsync` 不過濾（帳號停用之後，歷史紀錄上的人還是得查得到）。
+兩個方法的狀態過濾也刻意不同：`ListSelectableAsync` 只列 `Active` 的帳號（不該把錢指派給已離職的人），`FindByIdAsync` 不過濾（帳號停用之後，歷史紀錄上的人還是得查得到）。
 
 要**改**帳號（啟用、停用、換角色、換密碼）走的是另一個介面 `IUserAccountStore`，刻意不跟這個唯讀的目錄混在一起，理由見〈[帳號生命週期與使用者管理](user-accounts.md)〉。
 
