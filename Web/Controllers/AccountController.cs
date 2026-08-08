@@ -114,40 +114,6 @@ public sealed class AccountController : Controller
         return RedirectToAction(nameof(Login));
     }
 
-    [AllowAnonymous]
-    public IActionResult Register()
-    {
-        return View(new RegisterForm());
-    }
-
-    [HttpPost]
-    [AllowAnonymous]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Register(
-        RegisterForm form,
-        CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid)
-        {
-            return View(form);
-        }
-
-        var result = await _userAccounts.RegisterAsync(
-            new RegisterUserCommand(form.UserName, form.Email, form.DisplayName, form.Password),
-            cancellationToken);
-
-        if (!result.Succeeded)
-        {
-            AddErrors(result);
-            return View(form);
-        }
-
-        // 註冊完不自動登入——帳號還是 Pending，本來就登不進去。
-        TempData["SuccessMessage"] = "註冊完成。帳號需要主管啟用後才能登入，請聯絡主管。";
-
-        return RedirectToAction(nameof(Login));
-    }
-
     public IActionResult ChangePassword()
     {
         return View(new ChangePasswordForm());
@@ -210,7 +176,6 @@ public sealed class AccountController : Controller
 
     private static string StatusMessage(UserAccountStatus status) => status switch
     {
-        UserAccountStatus.Pending => "此帳號尚待主管啟用，啟用後才能登入。",
         UserAccountStatus.Disabled => "此帳號已停用，如需恢復請洽主管。",
         _ => InvalidCredentialsMessage
     };

@@ -1,35 +1,55 @@
-@model RegisterForm
+@model CreateUserForm
 
 @{
-    ViewData["Title"] = "註冊帳號";
+    ViewData["Title"] = "新增使用者";
 }
 
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <h1 class="h3 mb-1">註冊 ExpenseLite 帳號</h1>
-        <div class="text-muted small mb-4">送出後帳號需要主管啟用才能登入。</div>
+<div class="mb-3">
+    <a asp-action="Index">返回使用者列表</a>
+</div>
 
-        <form asp-action="Register" method="post">
+<div class="row">
+    <div class="col-md-5">
+        <h1 class="h3 mb-1">新增使用者</h1>
+        <div class="text-muted mb-4">建立完成後帳號立刻可以登入。</div>
+
+        <div class="alert alert-warning">
+            預設密碼請當面或用其他管道交給本人，並提醒他登入後用「修改密碼」自行換掉。
+        </div>
+
+        <form asp-action="Create" method="post">
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
             <div class="mb-3">
                 <label asp-for="UserName" class="form-label"></label>
-                <input asp-for="UserName" class="form-control" autocomplete="username" autofocus />
+                <input asp-for="UserName" class="form-control" autocomplete="off" autofocus />
                 <div class="form-text">登入時輸入的帳號，習慣上用 Email 的前綴，例如 <code>amber</code>。</div>
                 <span asp-validation-for="UserName" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
                 <label asp-for="DisplayName" class="form-label"></label>
-                <input asp-for="DisplayName" class="form-control" autocomplete="name" />
+                <input asp-for="DisplayName" class="form-control" autocomplete="off" />
                 <div class="form-text">報銷單、審核紀錄上會顯示這個名字。</div>
                 <span asp-validation-for="DisplayName" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
                 <label asp-for="Email" class="form-label"></label>
-                <input asp-for="Email" class="form-control" autocomplete="email" />
+                <input asp-for="Email" class="form-control" autocomplete="off" />
                 <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Role" class="form-label"></label>
+                <select asp-for="Role" class="form-select">
+                    @foreach (var role in ExpenseLiteRoles.All)
+                    {
+                        <option value="@role">@ExpenseLiteRoles.GetDisplayName(role)</option>
+                    }
+                </select>
+                <div class="form-text">主管可以核准報銷單、管理預支款與使用者。之後也能在列表上改。</div>
+                <span asp-validation-for="Role" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
@@ -45,12 +65,9 @@
                 <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100">送出註冊</button>
+            <button type="submit" class="btn btn-primary">建立帳號</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">取消</a>
         </form>
-
-        <div class="text-center mt-3">
-            <a asp-action="Login">已經有帳號了，前往登入</a>
-        </div>
     </div>
 </div>
 

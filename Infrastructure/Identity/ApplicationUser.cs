@@ -13,10 +13,10 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>
-    /// 帳號狀態。預設是 <see cref="UserAccountStatus.Pending"/>——自助註冊的人不該一註冊就能進來，
-    /// 要主管啟用。程式建立的帳號（bootstrap）需要能登入的話得自己指定 Active。
+    /// 帳號狀態。帳號只有主管建得出來，建立當下就要能用，所以預設是
+    /// <see cref="UserAccountStatus.Active"/>；停用是之後才會發生的事（離職、停權）。
     /// </summary>
-    public UserAccountStatus Status { get; set; } = UserAccountStatus.Pending;
+    public UserAccountStatus Status { get; set; } = UserAccountStatus.Active;
 
     /// <summary>
     /// 緊急存取帳號（break-glass）。這種帳號不能被停用、也不能降成員工，

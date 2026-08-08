@@ -48,8 +48,8 @@ public sealed class IdentityUserAccountStore : IUserAccountStore
         return user is null ? null : await MapAsync(user);
     }
 
-    public async Task<UserAccountResult> RegisterAsync(
-        RegisterUserCommand command,
+    public async Task<UserAccountResult> CreateAsync(
+        CreateUserCommand command,
         CancellationToken cancellationToken = default)
     {
         var user = new ApplicationUser
@@ -60,8 +60,9 @@ public sealed class IdentityUserAccountStore : IUserAccountStore
             // Identity 的 SignIn.RequireConfirmedAccount 本來就設成 false。
             EmailConfirmed = true,
             DisplayName = command.DisplayName,
-            // 註冊只會產生尚待啟用的帳號，這裡寫死不吃外面傳進來的值。
-            Status = UserAccountStatus.Pending
+            // 主管建好帳號就會當場把帳號與密碼交給本人，沒有「等待啟用」這一段。
+            // 明寫出來而不是靠 enum 的預設值，免得日後有人調整 UserAccountStatus 的順序就默默改了行為。
+            Status = UserAccountStatus.Active
         };
 
         var createResult = await _userManager.CreateAsync(user, command.Password);
@@ -70,7 +71,7 @@ public sealed class IdentityUserAccountStore : IUserAccountStore
             return Failed(createResult);
         }
 
-        var roleResult = await _userManager.AddToRoleAsync(user, ExpenseLiteRoles.Employee);
+        var roleResult = await _userManager.AddToRoleAsync(user, command.Role);
 
         return roleResult.Succeeded ? UserAccountResult.Success : Failed(roleResult);
     }

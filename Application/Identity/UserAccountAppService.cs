@@ -3,7 +3,7 @@ using ExpenseLite.Domain.Shared;
 namespace ExpenseLite.Application.Identity;
 
 /// <summary>
-/// 帳號管理的 use case 編排：註冊、啟用 / 停用、換角色、改密碼。
+/// 帳號管理的 use case 編排：建立、啟用 / 停用、換角色、改密碼。
 ///
 /// 為什麼「至少要有一位啟用中的主管」這條規則落在 Application Service 而不是 Domain：
 /// 它跨多個使用者（要看整份名單才知道自己是不是最後一個），照 §4.2 的判斷順序本來會是 Domain Service，
@@ -25,17 +25,21 @@ public sealed class UserAccountAppService
     {
         var accounts = await _accounts.ListAllAsync(cancellationToken);
 
-        // 尚待啟用的排最前面：那是主管進這一頁唯一「有事要做」的一群人。
+        // 已停用的沉到最後：他們多半已經離職，平常要找的是還在職的人。
         return accounts
             .OrderBy(StatusOrder)
             .ThenBy(x => x.DisplayName)
             .ToList();
     }
 
-    public Task<UserAccountResult> RegisterAsync(
-        RegisterUserCommand command,
+    public Task<UserAccountResult> CreateAsync(
+        CreateUserCommand command,
         CancellationToken cancellationToken = default)
-        => _accounts.RegisterAsync(command, cancellationToken);
+    {
+        EnsureRoleExists(command.Role);
+
+        return _accounts.CreateAsync(command, cancellationToken);
+    }
 
     public async Task<UserAccountResult> ActivateAsync(
         Guid userId,
@@ -72,10 +76,7 @@ public sealed class UserAccountAppService
         string role,
         CancellationToken cancellationToken = default)
     {
-        if (!ExpenseLiteRoles.All.Contains(role))
-        {
-            throw new DomainRuleViolationException("指定的角色不存在。");
-        }
+        EnsureRoleExists(role);
 
         var account = await GetRequiredAccountAsync(userId, cancellationToken);
 
@@ -133,6 +134,19 @@ public sealed class UserAccountAppService
         CancellationToken cancellationToken = default)
         => _accounts.RecordSignInAsync(userId, signedInAt, cancellationToken);
 
+    /// <summary>
+    /// 角色字串是從表單來的，不能直接信。建立帳號與換角色兩個入口都要擋，
+    /// 否則有人改掉表單的 value 就能把帳號掛到一個不存在的角色上——
+    /// 那個帳號登得進來，但每一頁的 <c>[Authorize(Roles = ...)]</c> 都會把他擋在外面。
+    /// </summary>
+    private static void EnsureRoleExists(string role)
+    {
+        if (!ExpenseLiteRoles.All.Contains(role))
+        {
+            throw new DomainRuleViolationException("指定的角色不存在。");
+        }
+    }
+
     private async Task<UserAccountDto> GetRequiredAccountAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
@@ -162,9 +176,8 @@ public sealed class UserAccountAppService
 
     private static int StatusOrder(UserAccountDto account) => account.Status switch
     {
-        UserAccountStatus.Pending => 0,
-        UserAccountStatus.Active => 1,
-        UserAccountStatus.Disabled => 2,
-        _ => 3
+        UserAccountStatus.Active => 0,
+        UserAccountStatus.Disabled => 1,
+        _ => 2
     };
 }

@@ -3,12 +3,14 @@
 @{
     ViewData["Title"] = "使用者";
     var currentUserId = User.GetUserId();
-    var pendingCount = Model.Count(x => x.Status == UserAccountStatus.Pending);
 }
 
-<div class="mb-3">
-    <h1 class="h3 mb-1">使用者</h1>
-    <div class="text-muted">員工自行註冊後會停在「尚待啟用」，由主管在這裡啟用。</div>
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1 class="h3 mb-1">使用者</h1>
+        <div class="text-muted">系統裡的帳號全部由主管在這一頁建立與維護。</div>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">新增使用者</a>
 </div>
 
 @if (TempData["ErrorMessage"] is string errorMessage)
@@ -19,11 +21,6 @@
 @if (TempData["SuccessMessage"] is string successMessage)
 {
     <div class="alert alert-success">@successMessage</div>
-}
-
-@if (pendingCount > 0)
-{
-    <div class="alert alert-warning">有 @pendingCount 個帳號尚待啟用。</div>
 }
 
 <div class="table-responsive">
@@ -127,7 +124,6 @@
 
     private static string StatusText(UserAccountStatus status) => status switch
     {
-        UserAccountStatus.Pending => "尚待啟用",
         UserAccountStatus.Active => "啟用中",
         UserAccountStatus.Disabled => "已停用",
         _ => status.ToString()
@@ -135,7 +131,6 @@
 
     private static string StatusBadgeClass(UserAccountStatus status) => status switch
     {
-        UserAccountStatus.Pending => "bg-warning text-dark",
         UserAccountStatus.Active => "bg-success",
         UserAccountStatus.Disabled => "bg-secondary",
         _ => "bg-light text-dark"

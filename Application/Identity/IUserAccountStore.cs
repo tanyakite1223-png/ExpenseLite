@@ -11,14 +11,14 @@ namespace ExpenseLite.Application.Identity;
 /// </summary>
 public interface IUserAccountStore
 {
-    /// <summary>列出所有帳號，含尚待啟用與已停用的（管理頁要看得到全部）。</summary>
+    /// <summary>列出所有帳號，含已停用的（管理頁要看得到全部）。</summary>
     Task<IReadOnlyList<UserAccountDto>> ListAllAsync(CancellationToken cancellationToken = default);
 
     Task<UserAccountDto?> FindAccountByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
-    /// <summary>建立一個「員工 / 尚待啟用」的帳號。</summary>
-    Task<UserAccountResult> RegisterAsync(
-        RegisterUserCommand command,
+    /// <summary>建立一個啟用中的帳號，角色由呼叫者指定（把關在 <c>UsersController</c> 的角色授權）。</summary>
+    Task<UserAccountResult> CreateAsync(
+        CreateUserCommand command,
         CancellationToken cancellationToken = default);
 
     Task<UserAccountResult> SetStatusAsync(

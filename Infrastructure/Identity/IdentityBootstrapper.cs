@@ -11,11 +11,11 @@ namespace ExpenseLite.Infrastructure.Identity;
 /// 開機時確保角色存在，並在「完全沒有使用者」時建立第一個主管帳號。
 ///
 /// 這是 bootstrap 而不是 seed：只負責讓一個空系統有辦法被登入一次，
-/// 之後的帳號一律由員工自助註冊、主管啟用（見 <see cref="UserAccountStatus"/>）。
+/// 之後的帳號一律由主管在使用者管理頁建立。
 /// 所以不建 demo 帳號，也不會在既有系統上補建任何東西——users 表只要有人就整段跳過。
 ///
-/// 選 bootstrap 而不是「第一個註冊的人自動變主管」，是因為它在第一次啟動時就完成，
-/// 那時還沒有人連得進來註冊，不存在搶註冊的空窗期，行為也可預測。
+/// 自助註冊拿掉之後（2026-08-08），這段是系統裡唯一「憑空生出帳號」的地方，
+/// 也就是說沒有它、或沒設 <c>Identity:SeedPassword</c>，新環境會完全沒有人進得去。
 /// </summary>
 public static class IdentityBootstrapper
 {
@@ -102,7 +102,6 @@ public static class IdentityBootstrapper
             Email = BootstrapEmail,
             EmailConfirmed = true,
             DisplayName = BootstrapDisplayName,
-            // 這個帳號沒有人可以幫它啟用（系統裡還沒有別的主管），所以直接給 Active。
             Status = UserAccountStatus.Active,
             // 緊急存取帳號（break-glass）：不能被停用、也不能降成員工。
             // 這是全系統唯一會設這個旗標的地方。

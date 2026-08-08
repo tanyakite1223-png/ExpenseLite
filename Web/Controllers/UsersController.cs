@@ -27,6 +27,58 @@ public sealed class UsersController : Controller
         return View(accounts);
     }
 
+    public IActionResult Create()
+    {
+        return View(new CreateUserForm());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(
+        CreateUserForm form,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(form);
+        }
+
+        try
+        {
+            var result = await _userAccounts.CreateAsync(
+                new CreateUserCommand(
+                    form.UserName,
+                    form.Email,
+                    form.DisplayName,
+                    form.Role,
+                    form.Password),
+                cancellationToken);
+
+            if (!result.Succeeded)
+            {
+                // 帳號或 Email 重複、密碼太短這類錯誤走 ModelState：
+                // 主管留在原本的表單上改掉那一欄就好，不必重打整張表。
+                foreach (var error in result.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error);
+                }
+
+                return View(form);
+            }
+
+            TempData["SuccessMessage"] =
+                $"已建立 {form.DisplayName}（{form.UserName}）的帳號，" +
+                "請當面或用其他管道把帳號與預設密碼給本人，並提醒他登入後自行修改密碼。";
+
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(form);
+        }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Activate(Guid id, CancellationToken cancellationToken)
