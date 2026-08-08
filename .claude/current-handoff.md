@@ -344,7 +344,7 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 目前有四個帳號、**沒有任何業務資料**（沒有報銷單、預支款、專案）：
 
 - `Admin` / 管理者 / Active / 主管 / **受保護（緊急存取帳號）**，密碼是 `Identity:SeedPassword`
-- `amber` / 王主管 / Active / 主管，密碼 `AmberPass123`
+- `amber` / 王主管 / Active / 主管，密碼 `Amber123`
 - `April` / 小波 / Active
 - `Butter` / 小奶油 / Active——**這個原本是 `Pending`**，2026-08-08 拿掉該狀態時用 `UPDATE` 改成 `Active`（等同「主管啟用了他」）
 
