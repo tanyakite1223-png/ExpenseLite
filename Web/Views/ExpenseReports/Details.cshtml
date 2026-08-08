@@ -7,7 +7,8 @@
     var isApplicant = Model.Report.ApplicantUserId == User.GetUserId();
     var canEdit = isApplicant
         && Model.Report.Status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
-    var canReview = User.IsManager() && Model.Report.Status is ExpenseReportStatus.Submitted;
+    // 主管本人的單，這幾顆按鈕不出現——真正的把關在 ExpenseReport.EnsureReviewerIsNotApplicant。
+    var canReview = User.IsManager() && !isApplicant && Model.Report.Status is ExpenseReportStatus.Submitted;
     var isClosedProjectReport = Model.Report.ExpenseType == ExpenseType.Project
         && Model.Report.ProjectStatus == ProjectStatus.Closed;
     var canSubmit = canEdit && Model.Report.Details.Count > 0 && !isClosedProjectReport;

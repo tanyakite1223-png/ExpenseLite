@@ -193,6 +193,7 @@ public sealed class ExpenseReport
     public void Return(Guid reviewerUserId, string reviewerName, string reason)
     {
         EnsureSubmitted("只有送審中的報銷單可以退回。");
+        EnsureReviewerIsNotApplicant(reviewerUserId);
         Status = ExpenseReportStatus.Returned;
         _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Returned, reviewerUserId, reviewerName, reason));
     }
@@ -200,6 +201,7 @@ public sealed class ExpenseReport
     public void Approve(Guid reviewerUserId, string reviewerName)
     {
         EnsureSubmitted("只有送審中的報銷單可以核准。");
+        EnsureReviewerIsNotApplicant(reviewerUserId);
         Status = ExpenseReportStatus.Approved;
         _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Approved, reviewerUserId, reviewerName, null));
     }
@@ -207,6 +209,7 @@ public sealed class ExpenseReport
     public void Reject(Guid reviewerUserId, string reviewerName, string reason)
     {
         EnsureSubmitted("只有送審中的報銷單可以拒絕。");
+        EnsureReviewerIsNotApplicant(reviewerUserId);
         Status = ExpenseReportStatus.Rejected;
         _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Rejected, reviewerUserId, reviewerName, reason));
     }
@@ -271,6 +274,15 @@ public sealed class ExpenseReport
         if (Status != ExpenseReportStatus.Submitted)
         {
             throw new DomainRuleViolationException(message);
+        }
+    }
+
+    // 舊資料的 ApplicantUserId 可能是 null（登入功能之前建的),沒得比對就當作沒有這條限制。
+    private void EnsureReviewerIsNotApplicant(Guid reviewerUserId)
+    {
+        if (ApplicantUserId.HasValue && ApplicantUserId.Value == reviewerUserId)
+        {
+            throw new DomainRuleViolationException("不能審核自己送出的報銷單。");
         }
     }
 
