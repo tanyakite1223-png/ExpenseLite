@@ -31,6 +31,8 @@
             <option value="@ExpenseReportStatus.Returned" selected="@(Model.Status == ExpenseReportStatus.Returned)">退回</option>
             <option value="@ExpenseReportStatus.Approved" selected="@(Model.Status == ExpenseReportStatus.Approved)">已核准</option>
             <option value="@ExpenseReportStatus.Rejected" selected="@(Model.Status == ExpenseReportStatus.Rejected)">已拒絕</option>
+            <option value="@ExpenseReportStatus.Voided" selected="@(Model.Status == ExpenseReportStatus.Voided)">已作廢</option>
+            <option value="@ExpenseReportStatus.Cancelled" selected="@(Model.Status == ExpenseReportStatus.Cancelled)">已取消</option>
         </select>
     </div>
     <div class="col-12 col-md-4 col-lg-2">
@@ -50,12 +52,24 @@
             <option value="@ExpensePaymentMethod.PettyCash" selected="@(Model.PaymentMethod == ExpensePaymentMethod.PettyCash)">零用金支付</option>
         </select>
     </div>
-    <div class="col-12 col-lg-auto d-flex gap-2">
-        <button type="submit" class="btn btn-outline-primary">篩選</button>
-        @if (HasFilter(Model))
-        {
-            <a class="btn btn-outline-secondary" asp-action="Index">清除</a>
-        }
+    <div class="col-12 col-lg-auto d-flex align-items-center gap-3">
+        @* 已取消單預設隱藏，避免申請人自己軟刪過的東西一直干擾列表；勾這裡才顯示。 *@
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="includeCancelled"
+                   name="includeCancelled"
+                   value="true"
+                   @(Model.IncludeCancelled ? "checked" : "") />
+            <label class="form-check-label" for="includeCancelled">顯示已取消</label>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary">篩選</button>
+            @if (HasFilter(Model))
+            {
+                <a class="btn btn-outline-secondary" asp-action="Index">清除</a>
+            }
+        </div>
     </div>
 </form>
 
@@ -119,6 +133,8 @@ else
         ExpenseReportStatus.Returned => "退回",
         ExpenseReportStatus.Approved => "已核准",
         ExpenseReportStatus.Rejected => "已拒絕",
+        ExpenseReportStatus.Voided => "已作廢",
+        ExpenseReportStatus.Cancelled => "已取消",
         _ => status.ToString()
     };
 
@@ -147,7 +163,8 @@ else
         => !string.IsNullOrWhiteSpace(page.Keyword) ||
            page.Status is not null ||
            page.ExpenseType is not null ||
-           page.PaymentMethod is not null;
+           page.PaymentMethod is not null ||
+           page.IncludeCancelled;
 
     private static string EmptyReportMessage(ExpenseReportListPageDto page)
         => page.TotalExpenseReportCount == 0

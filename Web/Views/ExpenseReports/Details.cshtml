@@ -5,10 +5,15 @@
     // 這裡算出來的旗標只用來決定「按鈕要不要顯示」，是 UX。
     // 真正阻止未授權操作的是 Application Service 與 [Authorize]，不是這幾行。
     var isApplicant = Model.Report.ApplicantUserId == User.GetUserId();
+    var isManager = User.IsManager();
     var canEdit = isApplicant
         && Model.Report.Status is ExpenseReportStatus.Draft or ExpenseReportStatus.Returned;
-    // 主管本人的單，這幾顆按鈕不出現——真正的把關在 ExpenseReport.EnsureReviewerIsNotApplicant。
-    var canReview = User.IsManager() && !isApplicant && Model.Report.Status is ExpenseReportStatus.Submitted;
+    // 主管本人的單，審核 / 作廢按鈕都不出現——真正的把關在 ExpenseReport.EnsureReviewerIsNotApplicant。
+    var canReview = isManager && !isApplicant && Model.Report.Status is ExpenseReportStatus.Submitted;
+    var canVoid = isManager && !isApplicant && Model.Report.Status is ExpenseReportStatus.Approved;
+    var canDelete = isApplicant && Model.Report.Status is ExpenseReportStatus.Draft;
+    var canCancel = isApplicant && Model.Report.Status is ExpenseReportStatus.Returned;
+    var canRestore = isApplicant && Model.Report.Status is ExpenseReportStatus.Cancelled;
     var isClosedProjectReport = Model.Report.ExpenseType == ExpenseType.Project
         && Model.Report.ProjectStatus == ProjectStatus.Closed;
     var canSubmit = canEdit && Model.Report.Details.Count > 0 && !isClosedProjectReport;
@@ -33,6 +38,27 @@
     <div class="alert alert-warning">這張報銷單連到已結案專案，不可送審。</div>
 }
 
+@* 作廢後的持續提示：核對算式即時扣掉了這張單，但已計入的結清紀錄不會自己動。 *@
+@if (Model.Report.Status == ExpenseReportStatus.Voided && Model.Report.AdoptedSettlementRecordCount > 0)
+{
+    <div class="alert alert-warning">
+        <strong>這張單已作廢</strong>，但對應預支款上仍有 @Model.Report.AdoptedSettlementRecordCount 筆已計入的結清紀錄。
+        「已核准報銷」金額已即時扣掉這張單，那些結清紀錄不會自動變動——
+        請前往預支款詳情頁確認並手動處理（標記不採用或補一筆反向結清紀錄）。
+    </div>
+}
+
+@if (Model.Report.Status == ExpenseReportStatus.Cancelled)
+{
+    <div class="alert alert-secondary">
+        這張單目前是「已取消」狀態，不在流程中，也不會被列表預設顯示。
+        @if (canRestore)
+        {
+            <text>若要重新處理，請按上方的「復活」回到退回狀態。</text>
+        }
+    </div>
+}
+
 <div class="d-flex align-items-start justify-content-between mb-4">
     <div>
         <h1 class="h3 mb-1">@Model.Report.Title</h1>
@@ -51,12 +77,34 @@
         }
     </div>
     <div class="text-end">
-        <div class="badge bg-secondary mb-2">@StatusText(Model.Report.Status)</div>
+        <div class="badge @StatusBadgeClass(Model.Report.Status) mb-2">@StatusText(Model.Report.Status)</div>
         <div class="fs-4">@Model.Report.TotalAmount.ToString("N2")</div>
-        @if (canEdit)
-        {
-            <a class="btn btn-outline-primary btn-sm mt-2" asp-action="Edit" asp-route-id="@Model.Report.Id">修改報銷單</a>
-        }
+        <div class="d-flex flex-wrap gap-2 justify-content-end mt-2">
+            @if (canEdit)
+            {
+                <a class="btn btn-outline-primary btn-sm" asp-action="Edit" asp-route-id="@Model.Report.Id">修改報銷單</a>
+            }
+            @if (canDelete)
+            {
+                <form asp-action="Delete" asp-route-id="@Model.Report.Id" method="post"
+                      onsubmit="return confirm('確定要刪除這張草稿嗎？這個動作無法復原。');">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">刪除草稿</button>
+                </form>
+            }
+            @if (canCancel)
+            {
+                <form asp-action="Cancel" asp-route-id="@Model.Report.Id" method="post"
+                      onsubmit="return confirm('確定要取消這張退回單嗎？取消後不會消失，可隨時從詳情頁復活。');">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">取消此單</button>
+                </form>
+            }
+            @if (canRestore)
+            {
+                <form asp-action="Restore" asp-route-id="@Model.Report.Id" method="post">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">復活</button>
+                </form>
+            }
+        </div>
     </div>
 </div>
 
@@ -274,7 +322,7 @@
         }
         else
         {
-            <div class="alert alert-info">報銷單送審後不可修改明細。</div>
+            <div class="alert alert-info">@NonEditableReasonText(Model.Report.Status)</div>
         }
 
         @if (canReview)
@@ -315,6 +363,37 @@
                 </div>
             </form>
         }
+
+        @if (canVoid)
+        {
+            <h2 class="h5 mt-4 mb-3">作廢處理</h2>
+            @if (Model.Report.AdoptedSettlementRecordCount > 0)
+            {
+                @* 作廢前的確認：告知後果，讓主管當下就意識到還有結清紀錄要手動處理。 *@
+                <div class="alert alert-warning small">
+                    <strong>注意</strong>：這張單牽動了 @Model.Report.AdoptedSettlementRecordCount 筆對應預支款上的已計入結清紀錄。
+                    作廢後「已核准報銷」金額會即時變動，但那幾筆結清紀錄不會自動動——需要你到預支款詳情頁手動處理。
+                </div>
+            }
+            <form asp-action="Void" asp-route-id="@Model.Report.Id" method="post"
+                  onsubmit="return confirm('確定要作廢這張已核准的報銷單嗎？作廢後不可撤銷，要救只能重打一張新單。');">
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="mb-3">
+                    <label class="form-label">作廢人</label>
+                    <input class="form-control" value="@User.GetDisplayName()" readonly />
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Void.Reason" class="form-label">作廢原因</label>
+                    <textarea asp-for="Void.Reason" name="Reason" class="form-control" rows="4" required></textarea>
+                    <div class="form-text">會寫入審核紀錄，日後查得到當時為什麼撤下這張單。</div>
+                    <span asp-validation-for="Void.Reason" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-danger btn-sm">作廢</button>
+            </form>
+        }
     </div>
 </div>
 
@@ -330,7 +409,17 @@
         ExpenseReportStatus.Returned => "退回",
         ExpenseReportStatus.Approved => "已核准",
         ExpenseReportStatus.Rejected => "已拒絕",
+        ExpenseReportStatus.Voided => "已作廢",
+        ExpenseReportStatus.Cancelled => "已取消",
         _ => status.ToString()
+    };
+
+    // 兩種終態視覺跟其他狀態拉開：作廢是「主管撤下的」用深色警示；取消是「申請人自己拉下的」用淺色。
+    private static string StatusBadgeClass(ExpenseReportStatus status) => status switch
+    {
+        ExpenseReportStatus.Voided => "bg-danger",
+        ExpenseReportStatus.Cancelled => "bg-light text-dark border",
+        _ => "bg-secondary"
     };
 
     private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
@@ -373,9 +462,18 @@
         ExpenseReviewAction.Returned => "退回",
         ExpenseReviewAction.Approved => "核准",
         ExpenseReviewAction.Rejected => "拒絕",
+        ExpenseReviewAction.Voided => "作廢",
         _ => action.ToString()
     };
 
     private static string DisplayReviewReason(ExpenseReviewRecordDto review)
         => string.IsNullOrWhiteSpace(review.Reason) ? "-" : review.Reason;
+
+    // 頂部的狀態徽章 + alert 已經傳達了整體狀態，這裡的訊息只是「為什麼右邊沒有新增明細表單」。
+    private static string NonEditableReasonText(ExpenseReportStatus status) => status switch
+    {
+        ExpenseReportStatus.Cancelled => "這張單已取消，要修改請先復活。",
+        ExpenseReportStatus.Voided => "已作廢的報銷單不可修改。",
+        _ => "報銷單送審後不可修改明細。"
+    };
 }

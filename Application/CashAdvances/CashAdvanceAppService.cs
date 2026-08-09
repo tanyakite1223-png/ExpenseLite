@@ -130,12 +130,14 @@ public sealed class CashAdvanceAppService
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
         var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
         var relatedCashAdvanceIds = await GetRelatedCashAdvanceIdsAsync(cancellationToken);
+        var voidedRelatedCounts = await GetVoidedRelatedReportCountsAsync(cancellationToken);
 
         return MapSettlementDetail(
             cashAdvance,
             approvedAmounts.GetValueOrDefault(cashAdvance.Id),
             inProgressCashAdvanceIds.Contains(cashAdvance.Id),
-            relatedCashAdvanceIds.Contains(cashAdvance.Id));
+            relatedCashAdvanceIds.Contains(cashAdvance.Id),
+            voidedRelatedCounts.GetValueOrDefault(cashAdvance.Id));
     }
 
     public async Task RecordSettlementAsync(
@@ -346,6 +348,24 @@ public sealed class CashAdvanceAppService
             .ToHashSet();
     }
 
+    /// <summary>
+    /// 每筆預支款上有幾張已被主管作廢的報銷單。作廢的單子已不再算進「已核准報銷」金額，
+    /// 但已計入的結清紀錄不會自動動——預支款詳情頁 &gt; 0 時要顯示提示，讓主管去手動處理。
+    /// </summary>
+    private async Task<Dictionary<Guid, int>> GetVoidedRelatedReportCountsAsync(
+        CancellationToken cancellationToken)
+    {
+        var reports = await _reports.ListAsync(cancellationToken);
+
+        return reports
+            .Where(x =>
+                x.PaymentMethod == ExpensePaymentMethod.PersonalAdvance &&
+                x.CashAdvanceId is not null &&
+                x.Status == ExpenseReportStatus.Voided)
+            .GroupBy(x => x.CashAdvanceId!.Value)
+            .ToDictionary(x => x.Key, x => x.Count());
+    }
+
     private async Task<bool> HasExpenseReportReferencesAsync(
         Guid cashAdvanceId,
         CancellationToken cancellationToken)
@@ -422,7 +442,8 @@ public sealed class CashAdvanceAppService
         CashAdvance cashAdvance,
         decimal approvedReimbursedAmount,
         bool hasInProgressReports,
-        bool hasRelatedReports)
+        bool hasRelatedReports,
+        int voidedRelatedReportCount)
     {
         var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
         var hasAdoptedSettlementRecords = cashAdvance.SettlementRecords.Any(x => !x.IsVoided);
@@ -442,6 +463,7 @@ public sealed class CashAdvanceAppService
             settlement.RequiredSettlementType,
             hasInProgressReports,
             hasRelatedReports,
+            voidedRelatedReportCount,
             !hasRelatedReports && !hasAdoptedSettlementRecords,
             settlement.ReconciliationStatus,
             cashAdvance.SettlementRecords

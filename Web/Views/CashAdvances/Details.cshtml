@@ -73,6 +73,16 @@
     </div>
 }
 
+@* 作廢後的持續提示：核對金額即時反映了作廢，但下方的結清紀錄不會自動動。 *@
+@if (Model.CashAdvance.VoidedRelatedReportCount > 0)
+{
+    <div class="alert alert-warning">
+        <strong>這筆預支款有 @Model.CashAdvance.VoidedRelatedReportCount 張已被作廢的報銷單。</strong>
+        「已核准報銷」金額已即時扣掉那幾張單，但下方已計入的結清紀錄不會自動動——
+        若那筆錢實際上要退回或方向反了，請自行標記相關結清紀錄為不採用，或再補一筆反向結清。
+    </div>
+}
+
 <div class="row g-4">
     <div class="col-lg-7">
         <h2 class="h5 mb-3">結清紀錄</h2>

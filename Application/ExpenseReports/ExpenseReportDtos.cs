@@ -22,13 +22,16 @@ public sealed record ExpenseReportListQuery(
     string? Keyword,
     ExpenseReportStatus? Status,
     ExpenseType? ExpenseType,
-    ExpensePaymentMethod? PaymentMethod);
+    ExpensePaymentMethod? PaymentMethod,
+    /// <summary>true 才會列出申請人軟刪的 Cancelled 單；預設隱藏。</summary>
+    bool IncludeCancelled = false);
 
 public sealed record ExpenseReportListPageDto(
     string Keyword,
     ExpenseReportStatus? Status,
     ExpenseType? ExpenseType,
     ExpensePaymentMethod? PaymentMethod,
+    bool IncludeCancelled,
     int TotalExpenseReportCount,
     IReadOnlyList<ExpenseReportListItemDto> Reports);
 
@@ -45,6 +48,12 @@ public sealed record ExpenseReportDetailDto(
     ExpensePaymentMethod PaymentMethod,
     Guid? CashAdvanceId,
     ExpenseReportCashAdvanceDto? CashAdvance,
+    /// <summary>
+    /// 這張報銷單所綁的預支款上，仍被採用（未標記不採用）的結清紀錄筆數。
+    /// 沒綁預支款的（一般支出 / 員工墊款 / 零用金）永遠為 0。
+    /// Approved 詳情頁作廢按鈕的確認框、以及 Voided 詳情頁的持續提示，都會用到這個數字。
+    /// </summary>
+    int AdoptedSettlementRecordCount,
     decimal TotalAmount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SubmittedAt,

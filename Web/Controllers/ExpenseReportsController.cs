@@ -31,10 +31,11 @@ public sealed class ExpenseReportsController : Controller
         ExpenseReportStatus? status,
         ExpenseType? expenseType,
         ExpensePaymentMethod? paymentMethod,
+        bool includeCancelled,
         CancellationToken cancellationToken)
     {
         var page = await _expenseReports.ListPageAsync(
-            new ExpenseReportListQuery(keyword, status, expenseType, paymentMethod),
+            new ExpenseReportListQuery(keyword, status, expenseType, paymentMethod, includeCancelled),
             User.ToCurrentUser(),
             cancellationToken);
 
@@ -367,6 +368,93 @@ public sealed class ExpenseReportsController : Controller
                 new ReviewExpenseReportCommand(id, User.ToCurrentUser(), form.Reason),
                 cancellationToken);
             TempData["SuccessMessage"] = "報銷單已拒絕。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    // 作廢跟核准 / 退回 / 拒絕一樣是主管動作，用同一條 [Authorize] 擋。
+    // 「不能作廢自己送的單」由 Domain 層 EnsureReviewerIsNotApplicant 擋——跟審核同一類。
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = ExpenseLiteRoles.Manager)]
+    public async Task<IActionResult> Void(Guid id, VoidExpenseReportForm form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["ErrorMessage"] = GetFirstModelError();
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        try
+        {
+            await _expenseReports.VoidAsync(
+                new VoidExpenseReportCommand(id, User.ToCurrentUser(), form.Reason),
+                cancellationToken);
+            TempData["SuccessMessage"] = "報銷單已作廢。若牽動了預支款結清紀錄，請前往該預支款詳情頁確認並手動處理。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    // 刪除 / 取消 / 復活都是申請人動作，「只有申請人可以」是資源授權，擋在 Application Service。
+    // 這裡的 Controller 就只是把 HTTP 轉成 command。
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _expenseReports.DeleteDraftAsync(
+                new DeleteExpenseReportCommand(id, User.ToCurrentUser()),
+                cancellationToken);
+            TempData["SuccessMessage"] = "草稿已刪除。";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _expenseReports.CancelAsync(
+                new CancelExpenseReportCommand(id, User.ToCurrentUser()),
+                cancellationToken);
+            TempData["SuccessMessage"] = "報銷單已取消。可隨時從詳情頁復活。";
+        }
+        catch (DomainRuleViolationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _expenseReports.RestoreAsync(
+                new RestoreExpenseReportCommand(id, User.ToCurrentUser()),
+                cancellationToken);
+            TempData["SuccessMessage"] = "報銷單已復活，回到退回狀態。";
         }
         catch (DomainRuleViolationException ex)
         {

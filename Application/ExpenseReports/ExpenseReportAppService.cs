@@ -50,6 +50,7 @@ public sealed class ExpenseReportAppService
             query.Status,
             query.ExpenseType,
             query.PaymentMethod,
+            query.IncludeCancelled,
             visible.Count,
             items);
     }
@@ -69,8 +70,33 @@ public sealed class ExpenseReportAppService
 
         var project = await GetProjectAsync(report.ProjectId, cancellationToken);
         var cashAdvance = await GetCashAdvanceSummaryAsync(report.CashAdvanceId, cancellationToken);
+        var adoptedSettlementCount = await GetAdoptedSettlementRecordCountAsync(
+            report.CashAdvanceId,
+            cancellationToken);
 
-        return MapDetails(report, project?.Name, project?.Status, cashAdvance);
+        return MapDetails(report, project?.Name, project?.Status, cashAdvance, adoptedSettlementCount);
+    }
+
+    /// <summary>
+    /// 這張報銷單所綁的預支款上，仍被採用的結清紀錄筆數。
+    /// 沒綁預支款直接回 0；作廢按鈕的確認框、Voided 後的持續提示都用這個判斷要不要提醒主管去處理。
+    /// </summary>
+    private async Task<int> GetAdoptedSettlementRecordCountAsync(
+        Guid? cashAdvanceId,
+        CancellationToken cancellationToken)
+    {
+        if (cashAdvanceId is null)
+        {
+            return 0;
+        }
+
+        var cashAdvance = await _cashAdvances.GetByIdAsync(cashAdvanceId.Value, cancellationToken);
+        if (cashAdvance is null)
+        {
+            return 0;
+        }
+
+        return cashAdvance.SettlementRecords.Count(x => !x.IsVoided);
     }
 
     public async Task<Guid> CreateAsync(CreateExpenseReportCommand command, CancellationToken cancellationToken = default)
@@ -205,6 +231,70 @@ public sealed class ExpenseReportAppService
         report.Reject(command.Reviewer.UserId, command.Reviewer.DisplayName, command.Reason ?? string.Empty);
 
         await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// 主管作廢已核准的報銷單。不可撤銷，要救就重打一張新單。
+    /// 「主管才能」是角色授權，擋在 Controller 的 [Authorize(Roles = Manager)]；
+    /// 「不能作廢自己送的單」是報銷單的 invariant，Domain method 內擋。
+    /// 已計入的結清紀錄由主管手動處理——這個方法不動它，只改報銷單狀態。
+    /// </summary>
+    public async Task VoidAsync(VoidExpenseReportCommand command, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+
+        report.Void(command.Reviewer.UserId, command.Reviewer.DisplayName, command.Reason);
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>申請人硬刪自己還沒送出過的草稿。</summary>
+    public async Task DeleteDraftAsync(DeleteExpenseReportCommand command, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeManagedByApplicant(report, command.Applicant);
+
+        if (report.Status != ExpenseReportStatus.Draft)
+        {
+            throw new DomainRuleViolationException("只有草稿可以刪除。已進入審核流程的報銷單請改用取消或作廢。");
+        }
+
+        await _reports.DeleteAsync(report, cancellationToken);
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>申請人取消退回單（軟刪）。可再由 <see cref="RestoreAsync"/> 復活。</summary>
+    public async Task CancelAsync(CancelExpenseReportCommand command, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeManagedByApplicant(report, command.Applicant);
+
+        report.Cancel();
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>申請人復活軟刪的報銷單，回到退回狀態、之後可再修改重送。</summary>
+    public async Task RestoreAsync(RestoreExpenseReportCommand command, CancellationToken cancellationToken = default)
+    {
+        var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
+        EnsureCanBeManagedByApplicant(report, command.Applicant);
+
+        report.Restore();
+
+        await _reports.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// 刪除 / 取消 / 復活都是「申請人自己動自己的單」，共用一條授權規則。
+    /// 跟 <see cref="EnsureCanBeEditedBy"/> 檢查一樣，只是訊息更廣，涵蓋三個非修改的動作。
+    /// </summary>
+    private static void EnsureCanBeManagedByApplicant(ExpenseReport report, CurrentUser actor)
+    {
+        if (report.ApplicantUserId != actor.UserId)
+        {
+            throw new ForbiddenOperationException("只有申請人可以管理自己的報銷單。");
+        }
     }
 
     private async Task<ExpenseReport> GetRequiredReportAsync(Guid id, CancellationToken cancellationToken)
@@ -374,6 +464,15 @@ public sealed class ExpenseReportAppService
             return false;
         }
 
+        // 軟刪的 Cancelled 預設隱藏，避免退回單被取消後在列表上一直干擾申請人與主管。
+        // 兩種情況會顯示：使用者勾了「顯示已取消」的篩選、或明確在狀態下拉選 Cancelled。
+        if (report.Status == ExpenseReportStatus.Cancelled &&
+            !query.IncludeCancelled &&
+            query.Status != ExpenseReportStatus.Cancelled)
+        {
+            return false;
+        }
+
         if (query.ExpenseType is not null && report.ExpenseType != query.ExpenseType)
         {
             return false;
@@ -408,7 +507,8 @@ public sealed class ExpenseReportAppService
         ExpenseReport report,
         string? projectName,
         ProjectStatus? projectStatus,
-        ExpenseReportCashAdvanceDto? cashAdvance)
+        ExpenseReportCashAdvanceDto? cashAdvance,
+        int adoptedSettlementRecordCount)
         => new(
             report.Id,
             report.Title,
@@ -422,6 +522,7 @@ public sealed class ExpenseReportAppService
             report.PaymentMethod,
             report.CashAdvanceId,
             cashAdvance,
+            adoptedSettlementRecordCount,
             report.TotalAmount.Amount,
             report.CreatedAt,
             report.SubmittedAt,

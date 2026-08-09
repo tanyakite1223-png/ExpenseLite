@@ -26,10 +26,10 @@ public sealed class ExpenseReviewRecord
             throw new DomainRuleViolationException("審核人不可空白。");
         }
 
-        if (action is ExpenseReviewAction.Returned or ExpenseReviewAction.Rejected &&
+        if (action is ExpenseReviewAction.Returned or ExpenseReviewAction.Rejected or ExpenseReviewAction.Voided &&
             string.IsNullOrWhiteSpace(reason))
         {
-            throw new DomainRuleViolationException("退回或拒絕時必須填寫原因。");
+            throw new DomainRuleViolationException("退回、拒絕或作廢時必須填寫原因。");
         }
 
         Id = Guid.NewGuid();

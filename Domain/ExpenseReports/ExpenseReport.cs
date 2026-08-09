@@ -214,6 +214,52 @@ public sealed class ExpenseReport
         _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Rejected, reviewerUserId, reviewerName, reason));
     }
 
+    /// <summary>
+    /// 主管作廢已核准的報銷單。作廢不可撤銷，要救就重打一張新單。
+    ///
+    /// 已核准報銷金額是即時算的：作廢當下這張單就不再算進去，但已計入的結清紀錄
+    /// 不會自己動——那筆錢現實中真的動過，怎麼補救留給主管手動判斷。
+    /// 詳情頁與相關預支款詳情頁會顯示提示，避免遺忘。
+    /// </summary>
+    public void Void(Guid reviewerUserId, string reviewerName, string reason)
+    {
+        if (Status != ExpenseReportStatus.Approved)
+        {
+            throw new DomainRuleViolationException("只有已核准的報銷單可以作廢。");
+        }
+        EnsureReviewerIsNotApplicant(reviewerUserId);
+        Status = ExpenseReportStatus.Voided;
+        _reviewRecords.Add(new ExpenseReviewRecord(ExpenseReviewAction.Voided, reviewerUserId, reviewerName, reason));
+    }
+
+    /// <summary>
+    /// 申請人取消退回的報銷單（軟刪）。單子仍留在系統中，主管與申請人都查得到，
+    /// 可再用 <see cref="Restore"/> 復活回退回狀態。
+    /// 「只有申請人可以」是資源授權，在 Application Service 擋，不在這裡。
+    /// </summary>
+    public void Cancel()
+    {
+        if (Status != ExpenseReportStatus.Returned)
+        {
+            throw new DomainRuleViolationException("只有退回的報銷單可以取消。");
+        }
+        Status = ExpenseReportStatus.Cancelled;
+    }
+
+    /// <summary>
+    /// 申請人復活軟刪的報銷單，回到退回狀態，之後可再修改重送。
+    /// 「軟刪的單本身不可修改，要改先復活」由 <see cref="EnsureEditable"/> 保障——
+    /// Cancelled 不在可修改的 whitelist 裡。
+    /// </summary>
+    public void Restore()
+    {
+        if (Status != ExpenseReportStatus.Cancelled)
+        {
+            throw new DomainRuleViolationException("只有已取消的報銷單可以復活。");
+        }
+        Status = ExpenseReportStatus.Returned;
+    }
+
     private static void EnsureApplicantIsValid(Guid applicantUserId, string applicantName)
     {
         if (applicantUserId == Guid.Empty)

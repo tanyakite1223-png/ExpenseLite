@@ -11,4 +11,6 @@ public sealed class ExpenseReportDetailsPage
     public EditExpenseDetailForm? EditDetail { get; init; }
 
     public ReviewExpenseReportForm Review { get; init; } = new();
+
+    public VoidExpenseReportForm Void { get; init; } = new();
 }

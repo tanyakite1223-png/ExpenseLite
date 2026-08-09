@@ -70,8 +70,10 @@ public sealed class ProjectAppService
 
         // 專案詳情頁本身所有人都進得來，但「相關報銷單」是報銷單資料，
         // 一樣照 ExpenseReportVisibility 過濾——不然員工從專案頁繞一圈就看得到別人的花費。
+        // 另外預設隱藏申請人軟刪的 Cancelled 單，跟報銷單列表一致；要查特定 Cancelled 單直接開 URL 進得去。
         var visibleReports = reports
             .Where(x => ExpenseReportVisibility.CanBeViewedBy(x, viewer))
+            .Where(x => x.Status != ExpenseReportStatus.Cancelled)
             .ToList();
 
         var reportItems = visibleReports
@@ -144,10 +146,13 @@ public sealed class ProjectAppService
             report.TotalAmount.Amount,
             report.CreatedAt);
 
+    // 用 whitelist 而不是 blacklist：新增狀態時預設「不算未完成」比較安全，
+    // Voided（作廢）與 Cancelled（申請人軟刪）都不再流動，不該算未完成。
     private static int CountUnfinishedReports(IReadOnlyList<ExpenseReport> reports)
         => reports.Count(x =>
-            x.Status != ExpenseReportStatus.Approved &&
-            x.Status != ExpenseReportStatus.Rejected);
+            x.Status == ExpenseReportStatus.Draft ||
+            x.Status == ExpenseReportStatus.Submitted ||
+            x.Status == ExpenseReportStatus.Returned);
 
     private static string NormalizeKeyword(string? keyword)
         => string.IsNullOrWhiteSpace(keyword) ? string.Empty : keyword.Trim();

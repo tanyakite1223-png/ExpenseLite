@@ -22,5 +22,11 @@ public interface IExpenseReportRepository
 
     Task AddAsync(ExpenseReport report, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 硬刪除。目前只用在申請人刪除自己還沒送出過的草稿——沒有審核紀錄、沒有結清紀錄綁著，
+    /// 刪掉真的沒有後遺症。已進入審核流程的單改用軟刪除（Cancelled 狀態），這裡不動。
+    /// </summary>
+    Task DeleteAsync(ExpenseReport report, CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
