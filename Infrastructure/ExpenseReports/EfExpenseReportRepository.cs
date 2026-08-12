@@ -50,7 +50,9 @@ public sealed class EfExpenseReportRepository : IExpenseReportRepository
             .Where(x =>
                 x.ExpenseType == ExpenseType.Project &&
                 x.ProjectId != null &&
-                IsUnfinished(x.Status) &&
+                (x.Status == ExpenseReportStatus.Draft ||
+                 x.Status == ExpenseReportStatus.Submitted ||
+                 x.Status == ExpenseReportStatus.Returned) &&
                 (applicantUserId == null || x.ApplicantUserId == applicantUserId))
             .GroupBy(x => x.ProjectId!.Value)
             .Select(x => new { ProjectId = x.Key, Count = x.Count() })
@@ -66,19 +68,12 @@ public sealed class EfExpenseReportRepository : IExpenseReportRepository
             .AnyAsync(x =>
                 x.ExpenseType == ExpenseType.Project &&
                 x.ProjectId == projectId &&
-                IsUnfinished(x.Status),
+                (x.Status == ExpenseReportStatus.Draft ||
+                 x.Status == ExpenseReportStatus.Submitted ||
+                 x.Status == ExpenseReportStatus.Returned),
                 cancellationToken);
     }
 
-    /// <summary>
-    /// 「未完成」= 還在流程裡（草稿、送審中、被退回）。
-    /// 用 whitelist 而不是 blacklist：新增狀態時預設「不算未完成」比較安全，
-    /// 例如 Voided（作廢）與 Cancelled（申請人軟刪）都不再流動、不該算未完成。
-    /// </summary>
-    private static bool IsUnfinished(ExpenseReportStatus status)
-        => status == ExpenseReportStatus.Draft ||
-           status == ExpenseReportStatus.Submitted ||
-           status == ExpenseReportStatus.Returned;
 
     public async Task AddAsync(ExpenseReport report, CancellationToken cancellationToken = default)
     {
