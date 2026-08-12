@@ -67,6 +67,12 @@ public sealed class CashAdvancesController : Controller
             return NotFound();
         }
 
+        if (!page.CashAdvance.CanEdit)
+        {
+            TempData["ErrorMessage"] = "這筆預支款已結清，不可修改。";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         return View(page);
     }
 

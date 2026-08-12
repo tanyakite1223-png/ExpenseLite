@@ -66,6 +66,7 @@ public sealed record CashAdvanceSettlementDetailDto(
     /// &gt; 0 時預支款詳情頁會顯示提示：「已作廢報銷單相關的結清紀錄可能與現況不符」。
     /// </summary>
     int VoidedRelatedReportCount,
+    bool CanEdit,
     bool CanEditAmount,
     CashAdvanceReconciliationStatus ReconciliationStatus,
     IReadOnlyList<CashAdvanceSettlementRecordDto> SettlementRecords);

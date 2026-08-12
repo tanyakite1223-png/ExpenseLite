@@ -101,6 +101,9 @@ public sealed class CashAdvanceAppService
         CancellationToken cancellationToken = default)
     {
         var cashAdvance = await GetExistingCashAdvanceAsync(command.CashAdvanceId, cancellationToken);
+        var approvedReimbursedAmount = await GetApprovedAmountAsync(cashAdvance.Id, cancellationToken);
+        EnsureCashAdvanceIsNotSettled(cashAdvance, approvedReimbursedAmount, "修改預支款");
+
         var amount = Money.From(command.Amount);
 
         if (cashAdvance.Amount != amount &&
@@ -189,12 +192,14 @@ public sealed class CashAdvanceAppService
     {
         var cashAdvance = await GetExistingCashAdvanceAsync(command.CashAdvanceId, cancellationToken);
         var record = GetExistingSettlementRecord(cashAdvance, command.SettlementRecordId);
+        var approvedReimbursedAmount = await GetApprovedAmountAsync(cashAdvance.Id, cancellationToken);
 
+        EnsureCashAdvanceIsNotSettled(cashAdvance, approvedReimbursedAmount, "修改結清紀錄");
         EnsureSettlementUpdateAmountIsAllowed(
             cashAdvance,
             record,
             command.Amount,
-            await GetApprovedAmountAsync(cashAdvance.Id, cancellationToken));
+            approvedReimbursedAmount);
 
         cashAdvance.UpdateSettlementRecord(
             command.SettlementRecordId,
@@ -210,6 +215,10 @@ public sealed class CashAdvanceAppService
         CancellationToken cancellationToken = default)
     {
         var cashAdvance = await GetExistingCashAdvanceAsync(command.CashAdvanceId, cancellationToken);
+        GetExistingSettlementRecord(cashAdvance, command.SettlementRecordId);
+
+        var approvedReimbursedAmount = await GetApprovedAmountAsync(cashAdvance.Id, cancellationToken);
+        EnsureCashAdvanceIsNotSettled(cashAdvance, approvedReimbursedAmount, "標記結清紀錄為不採用");
 
         cashAdvance.VoidSettlementRecord(
             command.SettlementRecordId,
@@ -276,6 +285,18 @@ public sealed class CashAdvanceAppService
     {
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
         return approvedAmounts.GetValueOrDefault(cashAdvanceId);
+    }
+
+    private static void EnsureCashAdvanceIsNotSettled(
+        CashAdvance cashAdvance,
+        decimal approvedReimbursedAmount,
+        string actionDescription)
+    {
+        var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
+        if (settlement.ReconciliationStatus == CashAdvanceReconciliationStatus.Settled)
+        {
+            throw new DomainRuleViolationException($"這筆預支款已結清，不可{actionDescription}。");
+        }
     }
 
     private static void EnsureSettlementUpdateAmountIsAllowed(
@@ -446,6 +467,8 @@ public sealed class CashAdvanceAppService
         int voidedRelatedReportCount)
     {
         var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
+        var isSettled = settlement.ReconciliationStatus == CashAdvanceReconciliationStatus.Settled;
+        var canEdit = !isSettled;
         var hasAdoptedSettlementRecords = cashAdvance.SettlementRecords.Any(x => !x.IsVoided);
 
         return new CashAdvanceSettlementDetailDto(
@@ -464,19 +487,21 @@ public sealed class CashAdvanceAppService
             hasInProgressReports,
             hasRelatedReports,
             voidedRelatedReportCount,
-            !hasRelatedReports && !hasAdoptedSettlementRecords,
+            canEdit,
+            canEdit && !hasRelatedReports && !hasAdoptedSettlementRecords,
             settlement.ReconciliationStatus,
             cashAdvance.SettlementRecords
                 .OrderByDescending(x => x.SettledAt)
                 .ThenByDescending(x => x.CreatedAt)
-                .Select(MapSettlementRecord)
+                .Select(x => MapSettlementRecord(x, canEdit))
                 .ToList());
     }
 
     private static CashAdvanceSettlementRecordDto MapSettlementRecord(
-        CashAdvanceSettlementRecord record)
+        CashAdvanceSettlementRecord record,
+        bool canEditCashAdvance)
     {
-        var canChange = !record.IsVoided;
+        var canChange = canEditCashAdvance && !record.IsVoided;
 
         return new CashAdvanceSettlementRecordDto(
             record.Id,

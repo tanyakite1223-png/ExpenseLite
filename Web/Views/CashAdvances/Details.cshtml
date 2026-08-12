@@ -30,11 +30,15 @@
     <div class="text-end">
         <div class="badge bg-secondary mb-2">@ReconciliationText(Model.CashAdvance.ReconciliationStatus)</div>
         <div class="fs-4">@Model.CashAdvance.Amount.ToString("N2")</div>
-        @if (isManager)
+        @if (isManager && Model.CashAdvance.CanEdit)
         {
             <a class="btn btn-sm btn-outline-secondary mt-2"
                asp-action="Edit"
                asp-route-id="@Model.CashAdvance.Id">修改預支款</a>
+        }
+        else if (isManager)
+        {
+            <div class="text-muted small mt-2">已結清後已鎖定</div>
         }
     </div>
 </div>
@@ -79,7 +83,14 @@
     <div class="alert alert-warning">
         <strong>這筆預支款有 @Model.CashAdvance.VoidedRelatedReportCount 張已被作廢的報銷單。</strong>
         「已核准報銷」金額已即時扣掉那幾張單，但下方已計入的結清紀錄不會自動動——
-        若那筆錢實際上要退回或方向反了，請自行標記相關結清紀錄為不採用，或再補一筆反向結清。
+        @if (Model.CashAdvance.CanEdit)
+        {
+            <span>若那筆錢實際上要退回或方向反了，請自行標記相關結清紀錄為不採用，或再補一筆反向結清。</span>
+        }
+        else
+        {
+            <span>這筆預支款已結清並鎖定；若日後要處理這類更正，需要另外開正式更正流程。</span>
+        }
     </div>
 }
 
@@ -222,7 +233,7 @@
         }
         else
         {
-            <div class="alert alert-success">這筆預支款已結清。</div>
+            <div class="alert alert-success">這筆預支款已結清，預支款資料與結清紀錄已鎖定。</div>
         }
     </div>
 </div>
