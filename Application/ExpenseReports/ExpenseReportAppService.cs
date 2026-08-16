@@ -78,6 +78,112 @@ public sealed class ExpenseReportAppService
     }
 
     /// <summary>
+    /// 產出列印報表：送審時間落在 [from, to] 區間內、狀態 Approved、依 viewer 過濾。
+    /// 用途：員工整理送出納、主管看月度總支出——一頁兩用，靠 <see cref="ExpenseReportVisibility"/> 分視角。
+    /// 分組 label 中文化直接在這裡做，避免每張報表 view 各寫一套；跟 raw enum 對應寫在私有 helper。
+    /// </summary>
+    public async Task<PrintReportDto> GetPrintReportAsync(
+        DateOnly from,
+        DateOnly to,
+        CurrentUser viewer,
+        CancellationToken cancellationToken = default)
+    {
+        // 使用者輸入的日期是本地觀點（例如「8/1 - 8/31」意指「本地 8/1 00:00 到 9/1 00:00 之前」）。
+        // SubmittedAt 存的是 UTC DateTimeOffset，把本地日期綁上本地 offset 之後，
+        // DateTimeOffset 比較會用絕對時刻自動換算，不會在時區交界處差一天。
+        var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+        var fromInclusive = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), offset);
+        var toExclusive = new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), offset);
+
+        var reports = await _reports.ListAsync(cancellationToken);
+        var projectNames = await GetProjectNamesAsync(cancellationToken);
+
+        var visible = reports
+            .Where(x => ExpenseReportVisibility.CanBeViewedBy(x, viewer))
+            .Where(x => x.Status == ExpenseReportStatus.Approved)
+            .Where(x => x.SubmittedAt.HasValue
+                && x.SubmittedAt.Value >= fromInclusive
+                && x.SubmittedAt.Value < toExclusive)
+            .OrderBy(x => x.ApplicantName)
+            .ThenBy(x => x.SubmittedAt)
+            .ToList();
+
+        // MapDetails 每張查一次專案 / 預支款，量小可接受；月度報表撐爆的規模再切成批次查詢。
+        var details = new List<ExpenseReportDetailDto>(visible.Count);
+        foreach (var report in visible)
+        {
+            var project = await GetProjectAsync(report.ProjectId, cancellationToken);
+            var cashAdvance = await GetCashAdvanceSummaryAsync(report.CashAdvanceId, cancellationToken);
+            var adopted = await GetAdoptedSettlementRecordCountAsync(report.CashAdvanceId, cancellationToken);
+            details.Add(MapDetails(report, project?.Name, project?.Status, cashAdvance, adopted));
+        }
+
+        var summary = BuildPrintSummary(visible, projectNames);
+
+        return new PrintReportDto(from, to, summary, details);
+    }
+
+    private static PrintReportSummaryDto BuildPrintSummary(
+        IReadOnlyList<ExpenseReport> reports,
+        IReadOnlyDictionary<Guid, string> projectNames)
+    {
+        var totalAmount = reports.Sum(x => x.TotalAmount.Amount);
+
+        var byApplicant = reports
+            .GroupBy(x => x.ApplicantName)
+            .Select(g => new PrintReportGroupItem(g.Key, g.Count(), g.Sum(x => x.TotalAmount.Amount)))
+            .OrderByDescending(x => x.TotalAmount)
+            .ToList();
+
+        var byExpenseType = reports
+            .GroupBy(x => x.ExpenseType)
+            .Select(g => new PrintReportGroupItem(ExpenseTypeLabel(g.Key), g.Count(), g.Sum(x => x.TotalAmount.Amount)))
+            .OrderByDescending(x => x.TotalAmount)
+            .ToList();
+
+        var byPaymentMethod = reports
+            .GroupBy(x => x.PaymentMethod)
+            .Select(g => new PrintReportGroupItem(PaymentMethodLabel(g.Key), g.Count(), g.Sum(x => x.TotalAmount.Amount)))
+            .OrderByDescending(x => x.TotalAmount)
+            .ToList();
+
+        // 一般支出沒有 ProjectId，歸「非專案支出」單獨一列，方便主管看專案花費對比。
+        var byProject = reports
+            .GroupBy(x => x.ProjectId)
+            .Select(g => new PrintReportGroupItem(
+                g.Key is null
+                    ? "非專案支出"
+                    : projectNames.TryGetValue(g.Key.Value, out var name) ? name : "(找不到專案)",
+                g.Count(),
+                g.Sum(x => x.TotalAmount.Amount)))
+            .OrderByDescending(x => x.TotalAmount)
+            .ToList();
+
+        return new PrintReportSummaryDto(
+            reports.Count,
+            totalAmount,
+            byApplicant,
+            byExpenseType,
+            byPaymentMethod,
+            byProject);
+    }
+
+    private static string ExpenseTypeLabel(ExpenseType expenseType) => expenseType switch
+    {
+        ExpenseType.General => "一般支出",
+        ExpenseType.Project => "專案支出",
+        _ => expenseType.ToString()
+    };
+
+    private static string PaymentMethodLabel(ExpensePaymentMethod paymentMethod) => paymentMethod switch
+    {
+        ExpensePaymentMethod.EmployeePaid => "員工墊款",
+        ExpensePaymentMethod.PersonalAdvance => "個人預支",
+        ExpensePaymentMethod.PettyCash => "零用金支付",
+        _ => paymentMethod.ToString()
+    };
+
+    /// <summary>
     /// 這張報銷單所綁的預支款上，仍被採用的結清紀錄筆數。
     /// 沒綁預支款直接回 0；作廢按鈕的確認框、Voided 後的持續提示都用這個判斷要不要提醒主管去處理。
     /// </summary>

@@ -9,7 +9,10 @@
         <h1 class="h3 mb-1">報銷單</h1>
         <div class="text-muted">員工墊款、個人預支與零用金支付的申請與追蹤</div>
     </div>
-    <a class="btn btn-primary" asp-action="Create">新增報銷單</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Print">列印本月</a>
+        <a class="btn btn-primary" asp-action="Create">新增報銷單</a>
+    </div>
 </div>
 
 <form asp-action="Index" method="get" class="row gy-2 gx-2 align-items-end mb-3">

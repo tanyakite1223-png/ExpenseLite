@@ -1,0 +1,262 @@
+@model PrintReportDto
+
+@{
+    ViewData["Title"] = "列印報表";
+    var isManager = User.IsManager();
+    // 員工只看得到自己的資料，「按申請人」分組永遠只有一列（自己），
+    // 跟頂部總計、下方自己那張大卡片的小計三處重複，所以員工版不畫這張分組卡。
+    var groups = new List<(string Title, IReadOnlyList<PrintReportGroupItem> Items)>();
+    if (isManager) { groups.Add(("按申請人", Model.Summary.ByApplicant)); }
+    groups.Add(("按支出類型", Model.Summary.ByExpenseType));
+    groups.Add(("按付款方式", Model.Summary.ByPaymentMethod));
+    groups.Add(("按專案", Model.Summary.ByProject));
+    var groupColClass = isManager ? "col-md-3" : "col-md-4";
+}
+
+@* 這幾條 print-only 樣式集中放這裡，跟頁面內容一起維護、不進 site.css。
+   實際列印時瀏覽器會自動用 @@media print 的規則覆蓋螢幕樣式。 *@
+<style>
+    @@media print {
+        header, footer, .no-print { display: none !important; }
+        /* 換人時強制分頁——出納對員工單據時，一疊發票對一張卡片。
+           同一人的多張報銷單則連續排列，不強制分頁（自然跨頁即可）。 */
+        .applicant-card + .applicant-card { page-break-before: always; }
+        body { background: white; }
+        .container { max-width: 100% !important; }
+    }
+    .applicant-card {
+        border: 1px solid #adb5bd;
+        border-radius: .5rem;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+        background: #fff;
+    }
+    .applicant-card .report-item {
+        border-top: 1px dashed #dee2e6;
+        padding-top: .75rem;
+        margin-top: .75rem;
+    }
+    .applicant-card .report-item:first-of-type {
+        border-top: none;
+        padding-top: 0;
+        margin-top: 0;
+    }
+    .summary-card {
+        border: 1px solid #dee2e6;
+        border-radius: .375rem;
+        padding: .75rem 1rem;
+        margin-bottom: 1rem;
+    }
+    .summary-card h6 { margin-bottom: .5rem; color: #495057; }
+</style>
+
+<div class="no-print d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1 class="h3 mb-1">列印報表</h1>
+        <div class="text-muted">
+            員工可以按區間列印自己已核准的報銷單，夾實體單據交給出納核對；
+            主管進來看到的則是同區間內全公司的支出。畫面上的控件在列印時會自動隱藏。
+        </div>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="window.print()">列印本頁</button>
+</div>
+
+<form method="get" asp-action="Print" class="row g-3 align-items-end mb-4 no-print">
+    <div class="col-auto">
+        <label for="from" class="form-label">起</label>
+        <input type="date" id="from" name="from" value="@Model.From.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-auto">
+        <label for="to" class="form-label">迄</label>
+        <input type="date" id="to" name="to" value="@Model.To.ToString("yyyy-MM-dd")" class="form-control" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">套用</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">回列表</a>
+    </div>
+    <div class="col-12 text-muted small">
+        區間依「送審時間」計算——這個月送出並已核准的單就是這個月要處理的量。
+    </div>
+</form>
+
+<div class="mb-2 text-muted small">
+    區間 <strong>@Model.From.ToString("yyyy/MM/dd")</strong> ~ <strong>@Model.To.ToString("yyyy/MM/dd")</strong>
+    （狀態：已核准）
+</div>
+
+<div class="d-flex justify-content-between align-items-baseline mb-3">
+    <h2 class="h4 mb-0">本區間彙總</h2>
+    <div>
+        共 <strong>@Model.Summary.TotalCount</strong> 張、
+        合計 <strong>@Model.Summary.TotalAmount.ToString("N0")</strong> 元
+    </div>
+</div>
+
+@if (Model.Summary.TotalCount == 0)
+{
+    <div class="alert alert-secondary">
+        本區間沒有已核准的報銷單。
+        @if (!User.IsManager())
+        {
+            <span>（你看到的是自己的資料——區間內沒有你送出的已核准單）</span>
+        }
+    </div>
+}
+else
+{
+    <div class="row">
+        @for (var i = 0; i < groups.Count; i++)
+        {
+            var group = groups[i];
+            <div class="@groupColClass">
+                <div class="summary-card">
+                    <h6>@group.Title</h6>
+                    @if (group.Items.Count == 0)
+                    {
+                        <div class="text-muted small">（無資料）</div>
+                    }
+                    else
+                    {
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                @foreach (var item in group.Items)
+                                {
+                                    <tr>
+                                        <td>@item.Label</td>
+                                        <td class="text-end text-muted small" style="width:4rem">@item.Count 張</td>
+                                        <td class="text-end" style="width:7rem">@item.TotalAmount.ToString("N0") 元</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <h2 class="h4 mb-3 mt-4">報銷單明細（依申請人）</h2>
+
+    @* 每個申請人一張大卡：出納收到一位員工的一疊發票，就對這位員工那張卡片打勾，一對一。
+       列印時「換人強制分頁」，同一人的多張報銷單則連續排列。 *@
+    @foreach (var group in Model.Reports.GroupBy(x => x.ApplicantName))
+    {
+        var applicantTotal = group.Sum(x => x.TotalAmount);
+        <section class="applicant-card">
+            <div class="d-flex justify-content-between align-items-baseline mb-3">
+                <h3 class="h5 mb-0">@group.Key</h3>
+                <div>
+                    共 <strong>@group.Count()</strong> 張、
+                    合計 <strong>@applicantTotal.ToString("N0")</strong> 元
+                </div>
+            </div>
+
+            @foreach (var report in group)
+            {
+                <div class="report-item">
+                    <div class="d-flex justify-content-between align-items-baseline mb-2">
+                        <div>
+                            <div class="fw-semibold">@report.Title</div>
+                            <div class="text-muted small">
+                                @ExpenseTypeText(report.ExpenseType)
+                                @if (report.ExpenseType == ExpenseType.Project)
+                                {
+                                    <span>・專案：@(report.ProjectName ?? "(找不到專案)")</span>
+                                }
+                                ・付款方式：@PaymentMethodText(report.PaymentMethod)
+                                @if (report.CashAdvance is not null)
+                                {
+                                    <span>・預支款：@report.CashAdvance.PayeeName / @report.CashAdvance.Purpose</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-semibold">@report.TotalAmount.ToString("N0") 元</div>
+                            <div class="text-muted small">
+                                送審 @(report.SubmittedAt?.ToLocalTime().ToString("yyyy/MM/dd HH:mm") ?? "-")
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="table table-sm align-middle mb-2">
+                        <thead>
+                            <tr>
+                                <th style="width:6rem">日期</th>
+                                <th style="width:6rem">類別</th>
+                                <th>說明</th>
+                                <th style="width:5rem">單據</th>
+                                <th style="width:9rem">發票號碼</th>
+                                <th style="width:6rem" class="text-end">金額</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var detail in report.Details)
+                            {
+                                <tr>
+                                    <td>@detail.ExpenseDate.ToString("yyyy/MM/dd")</td>
+                                    <td>@detail.Category</td>
+                                    <td>@detail.Description</td>
+                                    <td>@ReceiptTypeText(detail.ReceiptType)</td>
+                                    <td>@(detail.ReceiptType == ExpenseReceiptType.Invoice ? detail.InvoiceNumber : "-")</td>
+                                    <td class="text-end">@detail.Amount.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (report.ReviewRecords.Any())
+                    {
+                        <div class="text-muted small">
+                            審核紀錄：
+                            @foreach (var review in report.ReviewRecords.OrderBy(x => x.ReviewedAt))
+                            {
+                                <span class="me-2">
+                                    @review.ReviewedAt.ToLocalTime().ToString("MM/dd HH:mm")
+                                    @ReviewActionText(review.Action)
+                                    by @review.ReviewerName
+                                    @if (!string.IsNullOrWhiteSpace(review.Reason))
+                                    {
+                                        <span>（@review.Reason）</span>
+                                    }
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+}
+
+@functions {
+    private static string ExpenseTypeText(ExpenseType expenseType) => expenseType switch
+    {
+        ExpenseType.General => "一般支出",
+        ExpenseType.Project => "專案支出",
+        _ => expenseType.ToString()
+    };
+
+    private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
+    {
+        ExpensePaymentMethod.EmployeePaid => "員工墊款",
+        ExpensePaymentMethod.PersonalAdvance => "個人預支",
+        ExpensePaymentMethod.PettyCash => "零用金支付",
+        _ => paymentMethod.ToString()
+    };
+
+    private static string ReceiptTypeText(ExpenseReceiptType receiptType) => receiptType switch
+    {
+        ExpenseReceiptType.Receipt => "收據",
+        ExpenseReceiptType.Invoice => "發票",
+        _ => receiptType.ToString()
+    };
+
+    private static string ReviewActionText(ExpenseReviewAction action) => action switch
+    {
+        ExpenseReviewAction.Returned => "退回",
+        ExpenseReviewAction.Approved => "核准",
+        ExpenseReviewAction.Rejected => "拒絕",
+        ExpenseReviewAction.Voided => "作廢",
+        _ => action.ToString()
+    };
+}

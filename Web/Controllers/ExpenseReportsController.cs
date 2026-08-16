@@ -42,6 +42,28 @@ public sealed class ExpenseReportsController : Controller
         return View(page);
     }
 
+    /// <summary>
+    /// 列印報表：員工整理送出納、主管看月度支出，一頁兩用（可見度靠 App Service 過濾）。
+    /// 未指定日期時預設「本月 1 號到今日」——最常見的用法是「這個月」。
+    /// </summary>
+    public async Task<IActionResult> Print(
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var fromDate = from ?? new DateOnly(today.Year, today.Month, 1);
+        var toDate = to ?? today;
+
+        var page = await _expenseReports.GetPrintReportAsync(
+            fromDate,
+            toDate,
+            User.ToCurrentUser(),
+            cancellationToken);
+
+        return View(page);
+    }
+
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         return View(await BuildCreateFormAsync(new CreateExpenseReportForm(), cancellationToken));

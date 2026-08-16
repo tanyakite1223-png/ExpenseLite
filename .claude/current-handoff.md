@@ -3,7 +3,7 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-16 — 完成三件（同日）：(1) 首次登入強制改密碼——主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」都會逼本人下次登入時換掉，用 middleware 攔在全站；本人成功改完密碼後刻意 SignOut 並跳回登入頁（避免使用者在原頁看到密碼欄位以為「還沒改成功」）；(2) 只剩一位日常主管時給紅色 alert 提示——使用者管理頁頂端；(3) 主管不能停用 / 降級自己——App Service 擋 + UI 對 `isSelf` 不畫按鈕。Amber 已手動走完全部驗證（A/B/C/D 首次改密碼、E/F/G alert 顯示、I 側門測試），`dotnet build` 通過。migration 只新增 `AddRequirePasswordChange`（其他兩件無 schema 變動）。
+> 最後更新：2026-08-16 — 完成四件（同日）：(1) 首次登入強制改密碼——主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」都會逼本人下次登入時換掉，用 middleware 攔在全站；本人成功改完密碼後刻意 SignOut 並跳回登入頁（避免使用者在原頁看到密碼欄位以為「還沒改成功」）；(2) 只剩一位日常主管時給紅色 alert 提示——使用者管理頁頂端；(3) 主管不能停用 / 降級自己——App Service 擋 + UI 對 `isSelf` 不畫按鈕；(4) **列印報表**——`/ExpenseReports/Print?from=&to=`，區間查詢已核准報銷單，頂部四分組總表（按申請人 / 支出類型 / 付款方式 / 專案）+ 底部依申請人分卡的詳情。用途：員工整理送出納、主管看月度支出，同一頁靠 visibility 分視角。用 `@media print` CSS + `window.print()` 觸發列印，零套件。全部功能通過 build 與手動驗證。migration 只新增 `AddRequirePasswordChange`（其他三件無 schema 變動）。
 
 ---
 
@@ -93,6 +93,17 @@
 - 專案詳情頁可查詢該專案相關報銷單（依可見度過濾 + 排除 Cancelled），結案後仍可作為歷史查詢
 - **2026-08-12 修正 `/Projects` 查詢**：專案列表的未完成報銷單統計仍用 Draft / Submitted / Returned whitelist，但 repository 的 EF 查詢內不能呼叫 C# helper method，已改成查詢式直接列 enum 條件，避免 LINQ translation error。
 
+**列印報表（2026-08-16）**
+
+- `/ExpenseReports/Print?from=YYYY-MM-DD&to=YYYY-MM-DD`，未指定時預設「本月 1 號到今日」
+- **一頁兩用，靠 `ExpenseReportVisibility` 分視角**：員工只看自己（→ 整理已核准單交出納對照）、主管看全部（→ 看月度全公司支出）
+- **內容結構**：
+  - 頂部：期間顯示 + 總計（張數 / 金額）
+  - 中段：4 個分組總表（按申請人 / 按支出類型 / 按付款方式 / 按專案）；**員工版隱藏「按申請人」**（永遠只有自己一列，跟總計、下方大卡片小計重複），排版自動從 `col-md-3` 改成 `col-md-4`
+  - 底部：**依申請人分大卡片**——出納收到某員工一疊發票，就對這位員工那張卡片打勾。卡內含這人本區間所有已核准報銷單詳情
+- **只列 Approved、依「送審時間」篩選區間**——對員工「本月我報了什麼」、對主管「本月要處理的量」都對得上
+- **列印機制**：`@media print` CSS 隱藏 navbar / footer / form / 按鈕，`window.print()` 觸發；換申請人強制分頁，同一人多張連續排列。零 NuGet 套件
+
 ### 尚未做（已知缺口）
 
 - **沒有完整登入稽核**。只記每個帳號「最後一次」登入時間，沒有歷次紀錄、沒有來源 IP、也沒有登入失敗的軌跡。緊急存取帳號的告警因此只能做到「留下痕跡讓人事後看到」，不是即時通知（見〈已定案的設計決策 / 緊急存取帳號〉）。
@@ -145,6 +156,7 @@
 - **`Application/Identity/UserAccountResult`**——帳號操作的結果物件。存在理由見〈邏輯落點〉，不是隨手多包一層
 - **報銷單生命週期的完整狀態機**（2026-08-09）：7 個狀態、4 個 review action、申請人動作（`Submit/Cancel/Restore` + 硬刪草稿）與審核人動作（`Return/Approve/Reject/Void`）分開命名慣例——申請人動作無參數，審核人動作帶 reviewer 資訊。詳見 `docs/architecture/expense-report-lifecycle.md`
 - **`RequirePasswordChangeMiddleware`**（2026-08-16）——全站閘門，攔已登入但被要求先改密碼的人到 `/Account/ChangePassword`；用 middleware 而不是 MVC filter，跟「全站預設要登入」是同一種安全預設（filter 得每個 controller 標一次，漏一個就是缺口）。允許路徑白名單只有 `ChangePassword` 與 `Logout` 兩條。詳見 `docs/architecture/user-accounts.md` 的〈首次登入強制改密碼〉
+- **`PrintReportDto` 頁面 DTO + `@media print` 列印**（2026-08-16）——延伸「列表查詢頁面 DTO 由 App Service 組裝」的既有 pattern，另外多做兩件事：(a) 分組聚合（4 個維度小計 + 總計）在 App Service 一次算完、不下沉到 view；(b) 分組 label 的中文化也在 App Service（`ExpenseTypeLabel` / `PaymentMethodLabel` 小 helper），避免每個 view 各寫一套。View 只負責 `@media print` CSS 與 `window.print()` 觸發。零 NuGet 套件
 
 ### Web 層目錄慣例
 
@@ -166,7 +178,7 @@
 - `repository-and-ef-core.md`
 - `cash-advance-reconciliation.md`（含〈為什麼零用金不是預支款〉與「已結清後鎖定」決策，是預支款收斂的完整理由出處）
 - `project-expense-reference.md`
-- `list-filtering-queries.md`
+- `list-filtering-queries.md`（列表篩選在 Application、**列印報表也走同一種思路（2026-08-16 新增章節）**）
 - `identity-and-authentication.md`（認證：「你是誰」怎麼流進 Domain，含 `IUserDirectory`）
 - `authorization.md`（授權：「你能不能做」的兩種落點與判斷標準，含〈授權看的是「資料」，不是「頁面」〉）
 - `user-accounts.md`（帳號本身：帳號從哪裡來與**自助註冊的推翻紀錄**、兩態、登入順序、`IUserAccountStore` 為何獨立、緊急存取帳號、**首次登入強制改密碼、主管不能對自己動、只剩一位日常主管的提示（2026-08-16 新增三節）**、為什麼不做刪除使用者）
@@ -192,6 +204,7 @@
 放在 Application Service（跨 aggregate 查詢、use case 編排、DTO 組裝、資源授權）：
 
 - `ExpenseReportAppService`：Project / CashAdvance 是否存在、Project 是否仍可用、列表篩選與 DTO mapping、報銷單詳情頁的預支款摘要組裝
+- **`ExpenseReportAppService.GetPrintReportAsync(...)`**（2026-08-16）——列印報表 page DTO：區間 + visibility 過濾 Approved 單、組 4 個維度的分組小計、每張詳情復用 `MapDetails`。**時區處理**：使用者輸入 `DateOnly` 綁本地 offset 成 `DateTimeOffset`，跟 UTC 存的 `SubmittedAt` 用絕對時刻比較，不會在時區交界處差一天。分組 label 中文化的 helper 也放這裡（跟 raw enum 對應集中一處）
 - `ExpenseReportAppService.EnsureCanBeEditedBy(...)`——「只有申請人能改」需要先載入報銷單才知道申請人是誰，所以不可能在 Controller 判斷
 - **`ExpenseReportAppService.EnsureCanBeManagedByApplicant(...)`**（2026-08-09 新增）——刪除 / 取消 / 復活共用一條授權規則，跟 `EnsureCanBeEditedBy` 邏輯相同（比對 `ApplicantUserId`）但訊息更廣，涵蓋三個非修改動作
 - **`ExpenseReportAppService.DeleteDraftAsync(...)` / `CancelAsync(...)` / `RestoreAsync(...)` / `VoidAsync(...)`**（2026-08-09 新增）——四個新的 App Service 方法，Delete/Cancel/Restore 前先 `EnsureCanBeManagedByApplicant`；Void 沒 App 層授權（Controller 用 `[Authorize(Roles = Manager)]` 擋、「不能作廢自己送的單」由 Domain 擋）
@@ -410,6 +423,15 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 - 明細 `55555555-...`、審核紀錄 `66666666-...`（Admin 原本的核准 + April 的作廢，共 2 筆）
 - 另一張早於 fixture、2026-08-08 驗「審核人 ≠ 申請人」時留下的一般支出報銷單 `d4365203-66a3-4e4b-9602-74332de1ddcf`：員工墊款、300、申請人 amber、審核人 Admin、Approved。**本 session 拿它當側門測試 2 的靶**（amber POST /Void），結果被 Domain 擋、仍是 Approved
 
+**2026-08-16 額外灌的 Print 熱鬧版 fixture**（SQL 內容未落檔進 repo，需要重灌請跟 Claude 要一份；用途：驗證 Print 頁分組總表的顯示，資料涵蓋多申請人 / 支出類型 / 付款方式 / 專案）：
+
+- 4 張 Approved 報銷單，含各自的 details 與 review records：
+  - `aaaaaaaa-...` Butter 一般 / 員工墊款 / 8月交通費 / 800
+  - `bbbbbbbb-...` Butter 專案 / 個人預支（綁 fixture 預支款 22222222）/ 印刷材料 / 2500
+  - `cccccccc-...` amber 一般 / 零用金 / 辦公文具 / 350
+  - `dddddddd-...` April 專案 / 員工墊款 / 提案便當 / 1200
+- 另有一張來源不明的 Approved 單（Butter 830 元、專案支出、submitted 8/12）——可能是先前驗證留下的，跟 Print 熱鬧版剛好一起用，未清
+
 清空前有做 `pg_dump -Fc` 備份，**但放在當時的 session scratchpad（repo 外，且會隨 session 消失）**。除非 Amber 當時另外複製出去，否則視為沒有備份。舊資料裡的申請人 / 領款人 Guid 指向的是已被刪掉的 `manager`、`employee` 帳號，就算還原也會變成沒有人能修改的孤兒單。
 
 **已註冊為 Windows 服務 `postgresql-18`（2026-07-25）**
@@ -488,12 +510,13 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 - ✅ **首次登入強制改密碼**（2026-08-16）：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」入口在 `ApplicationUser.RequirePasswordChange` 設 true；本人成功改密碼時清 false。`RequirePasswordChangeMiddleware` 全站攔截，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 ChangePassword。順帶改動 `AccountController.ChangePassword`：成功後刻意 SignOut 並跳登入頁（避免 UX 陷阱）。詳見 `docs/architecture/user-accounts.md`。
 - ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）：使用者管理頁頂端。「日常主管」= 啟用中的主管扣掉緊急存取帳號。用 `alert-danger`（不是 warning），因為觸發條件是「流程已卡 / 快卡」不是提醒。詳見 `docs/architecture/user-accounts.md` 的〈只剩一位日常主管時的提示〉。
 - ✅ **主管不能停用 / 降級自己**（2026-08-16）：跟前一件同日順帶做的自我保護。App Service `DisableAsync` / `SetRoleAsync` 接 `CurrentUser actor` 比對 `userId == actor.UserId`；順序放在「最後一位主管」之前。View 對 `isSelf` 那一列不畫按鈕，「改為主管」不擋。詳見〈順帶擋掉「主管對自己動」〉。
+- ✅ **列印報表**（2026-08-16）：`/ExpenseReports/Print?from=&to=` 一頁兩用——員工整理已核准報銷單交出納對照、主管看月度全公司支出。頂部 4 分組總表（員工版隱藏「按申請人」）+ 底部依申請人分卡。`@media print` CSS + `window.print()`，零 NuGet 套件。詳見〈已完成功能 / 列印報表〉與 `docs/architecture/list-filtering-queries.md` 的〈列印報表：同一種思路的另一個例子〉。
 
 ### 應用面候補（尚未排序）
 
 - **UI / 美編整體檢視**：目前 Bootstrap 預設樣式，色塊感偏淡（例如 `alert-warning` Amber 手動驗證時反映「沒有色塊」——實際 markup 正確、只是預設淡黃底不夠鮮明）。Amber 決定等專案功能全部完成後**整批重新設計美編**，本項作為統一入口。**新增功能時繼續用 Bootstrap 標準 class，別為單一頁面自訂顏色。**
-- **附件 / 發票照片上傳**：會牽涉檔案儲存、安全性與大小限制。
 - **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定，可等美編重整時一併感受。
+- **附件 / 發票照片上傳** — **2026-08-16 Amber 決定不做**（記著避免下次又提議）。理由：涉及檔案儲存 / 大小限制 / 安全性，本階段範圍取捨掉。
 - 若未來真的要做沖銷、付款憑證或出納日記帳，需另開會計帳範圍設計，**不建議混進第一階段**。
 
 ### 開發環境待辦
