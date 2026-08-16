@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "使用者";
     var currentUserId = User.GetUserId();
+    var activeDailyManagerCount = (int)(ViewData["ActiveDailyManagerCount"] ?? 0);
 }
 
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -12,6 +13,30 @@
     </div>
     <a class="btn btn-primary" asp-action="Create">新增使用者</a>
 </div>
+
+@* 「日常主管」不含緊急存取帳號——那個帳號的定位就是日常不用，靠它撐日常審核違反設計。
+   剩 1 位以下時，他自己送的報銷單會沒有人能審或作廢（審核人 ≠ 申請人），所以平時就提醒補人。 *@
+@if (activeDailyManagerCount <= 1)
+{
+    <div class="alert alert-danger">
+        @if (activeDailyManagerCount == 0)
+        {
+            <strong>目前沒有日常主管。</strong>
+            <span>
+                只剩緊急存取帳號能維持系統運作，日常審核與作廢會全數卡住。
+                請盡快把某位員工改為主管，或啟用一位已停用的主管。
+            </span>
+        }
+        else
+        {
+            <strong>目前只有 1 位日常主管。</strong>
+            <span>
+                若這位主管本人送出報銷單將無人能審核或作廢（審核人不能是申請人）。
+                建議指派第二位主管以維持流程順暢。
+            </span>
+        }
+    </div>
+}
 
 @if (TempData["ErrorMessage"] is string errorMessage)
 {
@@ -62,6 +87,12 @@
                     {
                         <span class="text-muted small me-2">不可停用 / 降級</span>
                     }
+                    else if (isSelf)
+                    {
+                        @* 停用自己與把自己降成員工都沒有正當使用情境（誤按代價高：cookie 失效後得請另一位主管救）。
+                           真正的把關在 UserAccountAppService，這裡只是不畫出點得下去卻一定失敗的按鈕。 *@
+                        <span class="text-muted small me-2">不能停用 / 降級自己</span>
+                    }
                     else if (account.Status == UserAccountStatus.Active)
                     {
                         <form asp-action="Disable" asp-route-id="@account.UserId" method="post" class="d-inline"
@@ -76,10 +107,9 @@
                         </form>
                     }
 
-                    @if (account.IsProtected)
+                    @if (account.IsProtected || isSelf)
                     {
-                        @* 緊急存取帳號必須一直是啟用中的主管，所以停用與改角色的按鈕都不畫。
-                           真正的把關在 UserAccountAppService，這裡只是不要給出點得下去卻一定失敗的按鈕。 *@
+                        @* 受保護帳號與自己的那一列都不畫改角色按鈕，理由同前。 *@
                     }
                     else if (account.Role == ExpenseLiteRoles.Manager)
                     {

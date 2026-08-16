@@ -24,6 +24,8 @@ public sealed class UsersController : Controller
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var accounts = await _userAccounts.ListAsync(cancellationToken);
+        ViewData["ActiveDailyManagerCount"] =
+            await _userAccounts.CountActiveDailyManagersAsync(cancellationToken);
         return View(accounts);
     }
 
@@ -90,14 +92,14 @@ public sealed class UsersController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Disable(Guid id, CancellationToken cancellationToken)
         => await RunAsync(
-            () => _userAccounts.DisableAsync(id, cancellationToken),
+            () => _userAccounts.DisableAsync(id, User.ToCurrentUser(), cancellationToken),
             "帳號已停用。");
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetRole(Guid id, string role, CancellationToken cancellationToken)
         => await RunAsync(
-            () => _userAccounts.SetRoleAsync(id, role, cancellationToken),
+            () => _userAccounts.SetRoleAsync(id, role, User.ToCurrentUser(), cancellationToken),
             $"角色已改為{ExpenseLiteRoles.GetDisplayName(role)}。");
 
     public async Task<IActionResult> ResetPassword(Guid id, CancellationToken cancellationToken)

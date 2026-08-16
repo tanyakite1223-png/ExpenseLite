@@ -52,6 +52,7 @@ public sealed class UserAccountAppService
 
     public async Task<UserAccountResult> DisableAsync(
         Guid userId,
+        CurrentUser actor,
         CancellationToken cancellationToken = default)
     {
         var account = await GetRequiredAccountAsync(userId, cancellationToken);
@@ -61,6 +62,14 @@ public sealed class UserAccountAppService
             throw new DomainRuleViolationException(
                 "這是緊急存取帳號，不能停用。它的用途就是在沒有其他主管進得來時保留一條路；" +
                 "若要換掉它的密碼，請用「重設密碼」。");
+        }
+
+        // 停用自己沒有正當使用情境（離職通常由另一位主管處理），誤按代價高——
+        // 停完自己 cookie 30 分鐘內失效，得請另一位主管救。跟業界 IAM 慣例一致（Google Cloud、Azure）。
+        if (userId == actor.UserId)
+        {
+            throw new DomainRuleViolationException(
+                "不能停用自己的帳號。如需離職或暫停使用，請由另一位主管操作。");
         }
 
         await EnsureNotLastActiveManagerAsync(
@@ -74,6 +83,7 @@ public sealed class UserAccountAppService
     public async Task<UserAccountResult> SetRoleAsync(
         Guid userId,
         string role,
+        CurrentUser actor,
         CancellationToken cancellationToken = default)
     {
         EnsureRoleExists(role);
@@ -87,6 +97,14 @@ public sealed class UserAccountAppService
             {
                 throw new DomainRuleViolationException(
                     "這是緊急存取帳號，不能降成員工。它必須一直是主管，才能在其他人都進不來時救得了系統。");
+            }
+
+            // 跟停用自己同一類：主管把自己降成員工會馬上失去管理權限，實務上得請另一位主管救。
+            // 這條的正當情境比較少（接班要交出主管職的場景），但誤按代價高，先由另一位主管處理更穩。
+            if (userId == actor.UserId)
+            {
+                throw new DomainRuleViolationException(
+                    "不能把自己降成員工。若要交出主管職，請由另一位主管操作。");
             }
 
             await EnsureNotLastActiveManagerAsync(
@@ -127,6 +145,26 @@ public sealed class UserAccountAppService
         Guid userId,
         CancellationToken cancellationToken = default)
         => _accounts.FindAccountByIdAsync(userId, cancellationToken);
+
+    /// <summary>
+    /// 算「日常主管」的人數——啟用中的主管，扣掉緊急存取帳號。
+    /// 用途是使用者管理頁的提示：只剩一位日常主管時，他自己送出的報銷單就沒人能審或作廢
+    /// （2026-08-08 加了「審核人 ≠ 申請人」之後才變得急迫）。
+    ///
+    /// 為什麼扣掉緊急存取帳號：那個帳號的整個設計理念就是「日常不用」，
+    /// 拿它當日常審核人違反該帳號定位；如果算它，只要 Admin 存在就永遠不會觸發提示，
+    /// 這個提示等於沒用。定義集中在這裡，畫面只用來決定要不要顯示，不重寫規則。
+    /// </summary>
+    public async Task<int> CountActiveDailyManagersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var accounts = await _accounts.ListAllAsync(cancellationToken);
+
+        return accounts.Count(x =>
+            x.Status == UserAccountStatus.Active
+            && x.Role == ExpenseLiteRoles.Manager
+            && !x.IsProtected);
+    }
 
     public Task RecordSignInAsync(
         Guid userId,

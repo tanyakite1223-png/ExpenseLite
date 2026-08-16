@@ -3,7 +3,7 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-16 — 完成「首次登入強制改密碼」：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」都會逼本人下次登入時換掉，用 middleware 攔在全站；本人成功改完密碼後刻意 SignOut 並跳回登入頁（避免使用者在原頁看到密碼欄位以為「還沒改成功」）。Amber 已手動走完 A/B/C/D 四條驗證，`dotnet build` 通過，新增 migration `AddRequirePasswordChange` 已套用桌機 DB。
+> 最後更新：2026-08-16 — 完成三件（同日）：(1) 首次登入強制改密碼——主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」都會逼本人下次登入時換掉，用 middleware 攔在全站；本人成功改完密碼後刻意 SignOut 並跳回登入頁（避免使用者在原頁看到密碼欄位以為「還沒改成功」）；(2) 只剩一位日常主管時給紅色 alert 提示——使用者管理頁頂端；(3) 主管不能停用 / 降級自己——App Service 擋 + UI 對 `isSelf` 不畫按鈕。Amber 已手動走完全部驗證（A/B/C/D 首次改密碼、E/F/G alert 顯示、I 側門測試），`dotnet build` 通過。migration 只新增 `AddRequirePasswordChange`（其他兩件無 schema 變動）。
 
 ---
 
@@ -22,6 +22,8 @@
 - **修改密碼頁**（每個人改自己的，要驗舊密碼）。**成功後刻意 `SignOutAsync` 並跳回登入頁**，訊息用 `TempData` 帶到登入頁上顯示——避免留在原頁時密碼欄位還在、讓使用者以為「還沒改成功要再改一次」。首次強制與主動修改走同一條收尾路徑。
 - **首次登入強制改密碼（2026-08-16）**：`ApplicationUser.RequirePasswordChange` bool。三條「別人給的密碼」入口設 true：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin`；本人成功改自己密碼時清成 false。`RequirePasswordChangeMiddleware` 掛在 `UseAuthorization` 之後，已登入且旗標為 true 時，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 `/Account/ChangePassword`。旗標透過 `require_password_change` claim 承載（factory 登入時寫入），middleware 不用每個 request 查 DB。
 - **系統至少保留一位啟用中的主管**：停用最後一位主管、把最後一位主管降成員工，兩個入口都擋
+- **主管不能對自己動（2026-08-16）**：不能停用自己、不能把自己降成員工。順序放在「最後一位主管」之前，訊息更精確。View 對 `isSelf` 那一列不畫「停用」與「改為員工」按鈕，「改為主管」不擋（升不會造成鎖死）
+- **只剩一位日常主管時給紅色 alert（2026-08-16）**：使用者管理頁頂端。「日常主管」= 啟用中的主管**扣掉緊急存取帳號**（Admin 不算，理由：靠緊急帳號撐日常審核違反該帳號定位；算它就永遠不會觸發，提示等於沒用）。0 位、1 位分別顯示不同訊息。用 `alert-danger` 而非 warning，因為觸發條件是「流程已卡 / 快卡」不是「你可能想注意」
 - **緊急存取帳號（break-glass）**：bootstrap 建的 `Admin` 帶 `IsProtected`，不能停用、不能降級；登入時留 warning log、掛畫面橫幅、更新 `last_signed_in_at`
 - **Bootstrap 取代 seed**：角色每次開機確認；帳號只在 users 表為空時建一個主管 `Admin`，不再建 demo 帳號。自助註冊拿掉之後，**這是系統裡唯一「憑空生出帳號」的地方**——沒設 `Identity:SeedPassword` 的新環境就是真的沒有人進得去，沒有備援路徑
 - Identity 的英文錯誤訊息由 `ChineseIdentityErrorDescriber` 換成中文（只換句子，不改驗證規則）
@@ -34,7 +36,7 @@
 - **報銷單的可見度：主管看全部，其他人只看得到自己是申請人的**。列表、詳情、修改頁、**專案詳情頁的相關報銷單**都套同一條規則
 - **預支款列表與詳情所有登入者都進得去**，但內容依領款人過濾：主管看全部，員工只看自己是領款人的
 - 權限不足回 HTTP 403，導到 `/Account/AccessDenied`
-- 已實測繞過畫面的側門：直接 POST 送審別人的草稿、直接 POST 結清、直接開修改頁、直接打網址開別人報銷單的詳情頁、員工直接 POST `/Users/Activate`、直接開 `/Users/ResetPassword`，都被擋下。**2026-08-09 生命週期擴充新增的側門也已補驗**：Butter POST `/ExpenseReports/Delete/{amber 的草稿 ID}` → 302 到 AccessDenied、DB 未刪（`EnsureCanBeManagedByApplicant` 擋）；amber POST `/ExpenseReports/Void/{amber 自己送出並核准的單 ID}` → 302 回詳情頁、狀態仍 Approved（Domain `EnsureReviewerIsNotApplicant` 擋，跟審核用同一條）
+- 已實測繞過畫面的側門：直接 POST 送審別人的草稿、直接 POST 結清、直接開修改頁、直接打網址開別人報銷單的詳情頁、員工直接 POST `/Users/Activate`、直接開 `/Users/ResetPassword`，都被擋下。**2026-08-09 生命週期擴充新增的側門也已補驗**：Butter POST `/ExpenseReports/Delete/{amber 的草稿 ID}` → 302 到 AccessDenied、DB 未刪（`EnsureCanBeManagedByApplicant` 擋）；amber POST `/ExpenseReports/Void/{amber 自己送出並核准的單 ID}` → 302 回詳情頁、狀態仍 Approved（Domain `EnsureReviewerIsNotApplicant` 擋，跟審核用同一條）。**2026-08-16「主管動自己」側門也驗過**：amber POST `/Users/Disable/{amber-uid}` → 302 回 `/Users`、TempData 訊息「不能停用自己的帳號…」、DB 上 amber 仍 Active；amber POST `/Users/SetRole/{amber-uid}` role=Employee → 302 回 `/Users`、訊息「不能把自己降成員工…」、DB 上 amber 仍是主管
 
 **報銷單**
 
@@ -167,7 +169,7 @@
 - `list-filtering-queries.md`
 - `identity-and-authentication.md`（認證：「你是誰」怎麼流進 Domain，含 `IUserDirectory`）
 - `authorization.md`（授權：「你能不能做」的兩種落點與判斷標準，含〈授權看的是「資料」，不是「頁面」〉）
-- `user-accounts.md`（帳號本身：帳號從哪裡來與**自助註冊的推翻紀錄**、兩態、登入順序、`IUserAccountStore` 為何獨立、緊急存取帳號、**首次登入強制改密碼（2026-08-16 新增）**、為什麼不做刪除使用者）
+- `user-accounts.md`（帳號本身：帳號從哪裡來與**自助註冊的推翻紀錄**、兩態、登入順序、`IUserAccountStore` 為何獨立、緊急存取帳號、**首次登入強制改密碼、主管不能對自己動、只剩一位日常主管的提示（2026-08-16 新增三節）**、為什麼不做刪除使用者）
 
 ### 有無偏離 CLAUDE.md 規範（技術債）
 
@@ -207,6 +209,8 @@
 - **「未完成報銷單」判定全面改成 whitelist**（2026-08-09）：原本用 blacklist 排除 Approved/Rejected，改成明列 Draft/Submitted/Returned。三處都改：`EfExpenseReportRepository.CountUnfinishedProjectReportsAsync` / `HasUnfinishedProjectReportsAsync`、`ProjectAppService.CountUnfinishedReports`。動機：新增狀態時**預設不算未完成**比較安全（Voided/Cancelled 都不流動了，就不該算未完成）。**2026-08-12 修正實作細節**：repository 的 `IQueryable` 不能呼叫私有 C# helper method，whitelist 條件要直接寫在 LINQ expression 裡，否則 `/Projects` 會發生 EF Core LINQ translation error。
 - **`UserAccountAppService.EnsureNotLastActiveManagerAsync(...)`**——「系統至少要保留一位啟用中的主管」。這條**跨多個使用者**，照 §4.2 本來會是 Domain Service，但本專案的使用者刻意不是 Domain 的一員（`ApplicationUser` 繼承 Identity 型別、住 Infrastructure，Domain 只用 Guid 參照人）。要放進 Domain 就得先把使用者整個搬進去，代價遠大於一條規則。**這是誠實的例外，不是偷懶**，理由詳見 `docs/architecture/user-accounts.md`
 - `UserAccountAppService.DisableAsync(...)` / `SetRoleAsync(...)` 的緊急存取帳號檢查——同上，也需要先讀資料才知道那個帳號是不是受保護的
+- **`UserAccountAppService.DisableAsync` / `SetRoleAsync` 的「不能對自己動」檢查（2026-08-16）**——接 `CurrentUser actor` 參數，比對 `userId == actor.UserId`；順序放在「最後一位主管」之前，讓撞到的人拿到更精確的訊息。跟緊急存取帳號的檢查是同一類「業務規則，不是授權」（主管有權限，只是這次資料不合法），丟 `DomainRuleViolationException`
+- **`UserAccountAppService.CountActiveDailyManagersAsync`（2026-08-16）**——算「啟用中的主管扣掉緊急存取帳號」；用途是使用者管理頁的紅色 alert。定義集中在 App Service，View 只判斷 `<= 1` 是否顯示，不重寫規則
 - **`UserAccountResult` 為什麼不是例外**：建立帳號時「帳號重複 + Email 重複 + 密碼太短」可能同時發生，Identity 本來就回一整包，用例外只能丟第一條；也順帶擋住 `IdentityResult` 漏進 Application。分界線是「使用者自己能修正的走 result 進 ModelState，違反業務規則的（最後一位主管、緊急帳號、找不到帳號）照舊丟例外」
 - **首次登入強制改密碼的三個寫入點**（2026-08-16）——旗標本身放 `ApplicationUser.RequirePasswordChange`（Infrastructure），寫入邏輯放最靠近 Identity 的一層（`IdentityUserAccountStore` / `IdentityBootstrapper`），不下沉到 `UserAccountAppService`。理由：三個入口共通的判斷是「這個密碼是不是本人給的」——`CreateAsync`、`ResetPasswordAsync` 就是「別人給的」設 true、`ChangePasswordAsync` 成功時就是「本人自己給的」清 false，跟 `PasswordHash`、`SecurityStamp` 這類「跟密碼一體」的狀態一樣屬於 store 職責。App Service 不需要知道這個旗標。詳見 `docs/architecture/user-accounts.md`
 
@@ -482,13 +486,14 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 - ✅ **預支款已結清後鎖定**（2026-08-12）：預支款主檔、結清紀錄修改、標記不採用全部鎖住。Amber 已手動測過目前功能可正常使用。詳見〈已定案的設計決策 / 結清紀錄〉與 `docs/architecture/cash-advance-reconciliation.md`。
 - ✅ **修正 `/Projects` 專案列表錯誤**（2026-08-12）：`EfExpenseReportRepository` 的未完成報銷單統計改成 EF 可翻譯的 enum whitelist 條件，修掉 `IsUnfinished(...) could not be translated`。
 - ✅ **首次登入強制改密碼**（2026-08-16）：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」入口在 `ApplicationUser.RequirePasswordChange` 設 true；本人成功改密碼時清 false。`RequirePasswordChangeMiddleware` 全站攔截，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 ChangePassword。順帶改動 `AccountController.ChangePassword`：成功後刻意 SignOut 並跳登入頁（避免 UX 陷阱）。詳見 `docs/architecture/user-accounts.md`。
+- ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）：使用者管理頁頂端。「日常主管」= 啟用中的主管扣掉緊急存取帳號。用 `alert-danger`（不是 warning），因為觸發條件是「流程已卡 / 快卡」不是提醒。詳見 `docs/architecture/user-accounts.md` 的〈只剩一位日常主管時的提示〉。
+- ✅ **主管不能停用 / 降級自己**（2026-08-16）：跟前一件同日順帶做的自我保護。App Service `DisableAsync` / `SetRoleAsync` 接 `CurrentUser actor` 比對 `userId == actor.UserId`；順序放在「最後一位主管」之前。View 對 `isSelf` 那一列不畫按鈕，「改為主管」不擋。詳見〈順帶擋掉「主管對自己動」〉。
 
 ### 應用面候補（尚未排序）
 
 - **UI / 美編整體檢視**：目前 Bootstrap 預設樣式，色塊感偏淡（例如 `alert-warning` Amber 手動驗證時反映「沒有色塊」——實際 markup 正確、只是預設淡黃底不夠鮮明）。Amber 決定等專案功能全部完成後**整批重新設計美編**，本項作為統一入口。**新增功能時繼續用 Bootstrap 標準 class，別為單一頁面自訂顏色。**
 - **附件 / 發票照片上傳**：會牽涉檔案儲存、安全性與大小限制。
 - **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定，可等美編重整時一併感受。
-- **只剩一位主管時給提示**：目前「至少一位啟用中的主管」只在你想拿掉他的當下才擋。**2026-08-08 加了「審核人 ≠ 申請人」之後這件事變得更急**——只剩一位主管時他自己的單就核不了（現在還多一條：他自己的已核准單也沒人能作廢）。要不要在使用者管理頁平時就顯示警告（提醒指派第二位主管），Amber 尚未決定。
 - 若未來真的要做沖銷、付款憑證或出納日記帳，需另開會計帳範圍設計，**不建議混進第一階段**。
 
 ### 開發環境待辦
