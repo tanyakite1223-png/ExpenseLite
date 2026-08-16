@@ -31,6 +31,11 @@ public sealed class ApplicationUserClaimsPrincipalFactory
             identity.AddClaim(new Claim(ExpenseLiteClaimTypes.ProtectedAccount, "true"));
         }
 
+        if (user.RequirePasswordChange)
+        {
+            identity.AddClaim(new Claim(ExpenseLiteClaimTypes.RequirePasswordChange, "true"));
+        }
+
         return identity;
     }
 }

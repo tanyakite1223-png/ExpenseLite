@@ -62,7 +62,9 @@ public sealed class IdentityUserAccountStore : IUserAccountStore
             DisplayName = command.DisplayName,
             // 主管建好帳號就會當場把帳號與密碼交給本人，沒有「等待啟用」這一段。
             // 明寫出來而不是靠 enum 的預設值，免得日後有人調整 UserAccountStatus 的順序就默默改了行為。
-            Status = UserAccountStatus.Active
+            Status = UserAccountStatus.Active,
+            // 主管填的預設密碼是別人給的，本人第一次登入必須換掉——middleware 會攔到 ChangePassword 頁。
+            RequirePasswordChange = true
         };
 
         var createResult = await _userManager.CreateAsync(user, command.Password);
@@ -142,8 +144,21 @@ public sealed class IdentityUserAccountStore : IUserAccountStore
         }
 
         var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (!result.Succeeded)
+        {
+            return Failed(result);
+        }
 
-        return result.Succeeded ? UserAccountResult.Success : Failed(result);
+        // 本人自己改成功就等於「已經換掉主管給的預設密碼」，解除強制。
+        // 放在同一次 flush 之外多送一次 UpdateAsync 是為了不改動 ChangePassword 的流程契約——
+        // 只在真的成功時才動這個旗標。
+        if (user.RequirePasswordChange)
+        {
+            user.RequirePasswordChange = false;
+            await _userManager.UpdateAsync(user);
+        }
+
+        return UserAccountResult.Success;
     }
 
     public async Task<UserAccountResult> ResetPasswordAsync(
@@ -161,8 +176,16 @@ public sealed class IdentityUserAccountStore : IUserAccountStore
         // 順帶處理密碼規則與 security stamp 更新。這裡沒有寄信流程，所以自己簽發、自己馬上用掉。
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
         var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!result.Succeeded)
+        {
+            return Failed(result);
+        }
 
-        return result.Succeeded ? UserAccountResult.Success : Failed(result);
+        // 主管重設完的密碼跟建帳號時一樣是別人給的，本人下次進來還是要換掉。
+        user.RequirePasswordChange = true;
+        await _userManager.UpdateAsync(user);
+
+        return UserAccountResult.Success;
     }
 
     public async Task RecordSignInAsync(

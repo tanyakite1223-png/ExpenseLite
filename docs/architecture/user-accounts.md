@@ -140,6 +140,37 @@ UPDATE users SET is_protected = false WHERE user_name = 'Admin';
 
 順帶一提，Identity 內建的錯誤訊息是英文的。`ChineseIdentityErrorDescriber` 是 Identity 官方的擴充點，只換句子、不改任何驗證規則。
 
+## 首次登入強制改密碼
+
+有三條路產生「別人給的密碼」：**主管建帳號**（主管填的預設密碼）、**主管重設別人密碼**（同理）、**bootstrap 建 `Admin`**（部署者填的 `Identity:SeedPassword`）。這些密碼本人一開始就不是唯一知道的人。要縮短這個窗口，本人第一次登入必須換掉它。
+
+規則落在 `ApplicationUser.RequirePasswordChange` 這個 bool，寫入點三個、清除點一個：
+
+| 誰動它 | 值 |
+| --- | --- |
+| `IdentityUserAccountStore.CreateAsync`（主管建帳號） | true |
+| `IdentityUserAccountStore.ResetPasswordAsync`（主管重設別人密碼） | true |
+| `IdentityBootstrapper.CreateBootstrapManagerAsync`（bootstrap 建 `Admin`） | true |
+| `IdentityUserAccountStore.ChangePasswordAsync`（本人成功改自己密碼） | false |
+
+### 為什麼是 middleware，不是 filter
+
+`RequirePasswordChangeMiddleware` 掛在 `UseAuthorization` 之後。判斷邏輯很短：**已登入 + 旗標為 true + 目標不在允許路徑白名單（只有 `/Account/ChangePassword` 與 `/Account/Logout`），一律 302 到 `/Account/ChangePassword`。**
+
+用 middleware 而不是 MVC filter 的理由跟 §Program.cs 的 `SetFallbackPolicy` 是同一種思路：**這件事跟具體 controller / action 無關，是「全站的一道通道閘門」**。用 filter 就得每個 controller 標一次 attribute，漏標一個就是缺口；middleware 是「預設關起來」，例外用白名單維持。跟「全站預設要登入」是同一種安全預設。
+
+### 為什麼用 claim 而不是每個 request 查 DB
+
+`ApplicationUserClaimsPrincipalFactory` 在登入時把 `RequirePasswordChange` 寫成 `require_password_change` claim，middleware 讀 claim 就好，不用每個 request 對 users 表查一次。改密碼流程如何維持一致：**本人成功改完密碼後，`AccountController.ChangePassword` 會 `SignOutAsync` 並跳回登入頁**——下次登入時 factory 再讀 DB（此時值已是 false）產出新 claim，middleware 自然放行。
+
+### 改密碼成功後刻意登出
+
+`AccountController.ChangePassword` 成功後**不是** `RefreshSignInAsync` 停在原頁，而是 `SignOutAsync` + 跳登入頁、把成功訊息透過 `TempData` 顯示在登入頁上。這是 UX 上的取捨：**停在同一頁時密碼欄位還在，使用者容易誤以為「還沒改成功、要再改一次」**。順帶讓「首次強制」與「主動修改」走同一條收尾路徑，行為一致。
+
+### 老實記著的限制
+
+**主管替別人重設密碼時，對方 cookie 內的舊 claim 不會即時更新**——但 `ResetPasswordAsync` 內部會換掉 security stamp，Identity 最長 30 分鐘會強制對方重新登入，那時候才拿到 true 的新 claim。這跟停用 / 改角色的延遲屬於同一類，見〈老實記著的兩個限制〉。
+
 ## 為什麼沒有「刪除使用者」
 
 系統只能停用帳號，**沒有刪除功能，而且是刻意的**。

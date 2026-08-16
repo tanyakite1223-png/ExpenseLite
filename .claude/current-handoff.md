@@ -3,7 +3,7 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-12 17:28 — 完成「已結清預支款鎖定」（預支款主檔、結清紀錄修改、標記不採用全部關閉），並修正 `/Projects` 專案列表的 EF Core LINQ 翻譯錯誤；Amber 已手動測過目前功能可正常使用，`dotnet build` 通過，沒有新 migration。
+> 最後更新：2026-08-16 — 完成「首次登入強制改密碼」：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」都會逼本人下次登入時換掉，用 middleware 攔在全站；本人成功改完密碼後刻意 SignOut 並跳回登入頁（避免使用者在原頁看到密碼欄位以為「還沒改成功」）。Amber 已手動走完 A/B/C/D 四條驗證，`dotnet build` 通過，新增 migration `AddRequirePasswordChange` 已套用桌機 DB。
 
 ---
 
@@ -19,7 +19,8 @@
 - **沒有自助註冊。帳號只有兩個來源**：空系統時的 bootstrap，以及主管在使用者管理頁按「新增使用者」
 - **登入先驗密碼、再判帳號狀態**。用 `CheckPasswordSignInAsync` 只驗密碼不發 cookie，保留登入失敗鎖定；通過後才 `SignInAsync`。（狀態訊息只剩「已停用」一種，但這個順序仍然要維持——有差異就推得出帳號是否存在）
 - **使用者管理頁（限主管）**：新增使用者（可直接指定角色，建立即可登入）/ 啟用 / 停用 / 在員工與主管之間改角色 / 重設別人的密碼
-- **修改密碼頁**（每個人改自己的，要驗舊密碼；改完 `RefreshSignInAsync`，不會把自己踢出去）
+- **修改密碼頁**（每個人改自己的，要驗舊密碼）。**成功後刻意 `SignOutAsync` 並跳回登入頁**，訊息用 `TempData` 帶到登入頁上顯示——避免留在原頁時密碼欄位還在、讓使用者以為「還沒改成功要再改一次」。首次強制與主動修改走同一條收尾路徑。
+- **首次登入強制改密碼（2026-08-16）**：`ApplicationUser.RequirePasswordChange` bool。三條「別人給的密碼」入口設 true：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin`；本人成功改自己密碼時清成 false。`RequirePasswordChangeMiddleware` 掛在 `UseAuthorization` 之後，已登入且旗標為 true 時，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 `/Account/ChangePassword`。旗標透過 `require_password_change` claim 承載（factory 登入時寫入），middleware 不用每個 request 查 DB。
 - **系統至少保留一位啟用中的主管**：停用最後一位主管、把最後一位主管降成員工，兩個入口都擋
 - **緊急存取帳號（break-glass）**：bootstrap 建的 `Admin` 帶 `IsProtected`，不能停用、不能降級；登入時留 warning log、掛畫面橫幅、更新 `last_signed_in_at`
 - **Bootstrap 取代 seed**：角色每次開機確認；帳號只在 users 表為空時建一個主管 `Admin`，不再建 demo 帳號。自助註冊拿掉之後，**這是系統裡唯一「憑空生出帳號」的地方**——沒設 `Identity:SeedPassword` 的新環境就是真的沒有人進得去，沒有備援路徑
@@ -94,7 +95,6 @@
 
 - **沒有完整登入稽核**。只記每個帳號「最後一次」登入時間，沒有歷次紀錄、沒有來源 IP、也沒有登入失敗的軌跡。緊急存取帳號的告警因此只能做到「留下痕跡讓人事後看到」，不是即時通知（見〈已定案的設計決策 / 緊急存取帳號〉）。
 - **停用帳號 / 改角色不是即時生效**。改完會換掉 security stamp，但 Identity 每 30 分鐘才重新驗證一次 cookie（`SecurityStampValidationInterval` 預設值），所以最慢會延遲到那時候。以「停用通常是離職不是緊急封鎖」的情境可以接受；要即時就得縮短間隔，代價是每次驗證多一次 DB 查詢。
-- **沒有「首次登入強制改密碼」**。主管建帳號時要填一組預設密碼、當面交給本人，所以主管知道每個人的初始密碼；系統只能靠畫面文案提醒本人自己去改，擋不住他不改。要做的話得在 `ApplicationUser` 加一個旗標，並在全站加一道「還沒改過就導去改密碼頁」的攔截——是獨立的一個功能，2026-08-08 決定先不做。**沒有 SMTP 就沒有寄邀請信這個選項，總得有人把第一組密碼交出去。**
 - 沒有附件或發票照片上傳。
 - **沒有「忘記密碼」自助流程**，只能請主管重設（同樣是沒有 SMTP 的後果）。
 - 沒有完整會計總帳、付款憑證、出納日記帳，**且本階段刻意決定不做**。
@@ -102,7 +102,8 @@
 
 ### build & DB
 
-- `dotnet build` 成功，0 warning / 0 error。2026-08-12 Amber 手動測過目前功能可正常使用。
+- `dotnet build` 成功，0 warning / 0 error。2026-08-16 Amber 手動走完 A/B/C/D 四條驗證（建帳號 → 首次登入被攔、主管重設密碼 → 對方被攔、現有帳號不受影響、已改過的人不會被重複攔）。
+- **2026-08-16 新增 migration `AddRequirePasswordChange`**：純加欄位 `users.require_password_change`（bool，not null，default false），backfill 為 false——現有帳號完全不受影響，只有之後新建 / 被重設密碼的帳號才會被逼改。已套用桌機 DB。
 - **2026-08-12 沒有新 migration**——只改流程規則、Razor 入口與 EF 查詢寫法，schema 沒動。
 - **2026-08-09 沒有新 migration**——只加了兩個列舉值（`ExpenseReportStatus.Voided/Cancelled`）與一個 review action（`ExpenseReviewAction.Voided`），`enum 存字串`（`HasConversion<string>()`），schema 完全不用動。加值不像減值那樣有風險（減值時 DB 若有殘留字串會炸），加值只是「以後可能會出現的新字串」，DB 讀舊資料還是對得上。
 - **2026-08-08 拿掉 `Pending` 沒有產生新 migration**，schema 完全沒動。但**當時 DB 裡真的有一列 `'Pending'`（測試帳號 `Butter`），已用 `UPDATE users SET status='Active'` 處理掉**；不處理的話程式讀那一列會對不到列舉值而炸。教訓寫在〈疑難排解〉。
@@ -141,6 +142,7 @@
 - **`Application/Shared/ForbiddenOperationException`** 與 `DomainRuleViolationException` 分開，由 `Web/Filters/ForbiddenOperationExceptionFilter` 轉成 HTTP 403
 - **`Application/Identity/UserAccountResult`**——帳號操作的結果物件。存在理由見〈邏輯落點〉，不是隨手多包一層
 - **報銷單生命週期的完整狀態機**（2026-08-09）：7 個狀態、4 個 review action、申請人動作（`Submit/Cancel/Restore` + 硬刪草稿）與審核人動作（`Return/Approve/Reject/Void`）分開命名慣例——申請人動作無參數，審核人動作帶 reviewer 資訊。詳見 `docs/architecture/expense-report-lifecycle.md`
+- **`RequirePasswordChangeMiddleware`**（2026-08-16）——全站閘門，攔已登入但被要求先改密碼的人到 `/Account/ChangePassword`；用 middleware 而不是 MVC filter，跟「全站預設要登入」是同一種安全預設（filter 得每個 controller 標一次，漏一個就是缺口）。允許路徑白名單只有 `ChangePassword` 與 `Logout` 兩條。詳見 `docs/architecture/user-accounts.md` 的〈首次登入強制改密碼〉
 
 ### Web 層目錄慣例
 
@@ -148,6 +150,7 @@
 - `/Web/ViewModels`：表單與頁面模型，不是 Domain Model。
 - `/Web/Views`：Razor View，只負責畫面呈現與表單送出。
 - `/Web/Filters`：MVC filter，目前只有把 Application 例外轉成 HTTP 狀態碼這一支。
+- `/Web/Middleware`：ASP.NET Core middleware，目前只有 `RequirePasswordChangeMiddleware`（首次登入強制改密碼的全站閘門）。掛在 `Program.cs`，非個別 controller 適用時放這裡。
 - 根目錄不再保留 `/Controllers`、`/Models`、`/Views`。
 - `Program.cs` 有客製 Razor view location；之後新增 Razor View 要放在 `/Web/Views`。
 - `TempData` 訊息目前有三種：`SuccessMessage`、`ErrorMessage`、`WarningMessage`。**`WarningMessage` 目前沒有任何使用者**——它原本唯一的用途是 4b 的零用金提示，隨收斂一起消失。機制留著，之後有「不是成功、是提醒」的情境可以再用。
@@ -164,7 +167,7 @@
 - `list-filtering-queries.md`
 - `identity-and-authentication.md`（認證：「你是誰」怎麼流進 Domain，含 `IUserDirectory`）
 - `authorization.md`（授權：「你能不能做」的兩種落點與判斷標準，含〈授權看的是「資料」，不是「頁面」〉）
-- `user-accounts.md`（帳號本身：帳號從哪裡來與**自助註冊的推翻紀錄**、兩態、登入順序、`IUserAccountStore` 為何獨立、緊急存取帳號、為什麼不做刪除使用者）
+- `user-accounts.md`（帳號本身：帳號從哪裡來與**自助註冊的推翻紀錄**、兩態、登入順序、`IUserAccountStore` 為何獨立、緊急存取帳號、**首次登入強制改密碼（2026-08-16 新增）**、為什麼不做刪除使用者）
 
 ### 有無偏離 CLAUDE.md 規範（技術債）
 
@@ -205,6 +208,7 @@
 - **`UserAccountAppService.EnsureNotLastActiveManagerAsync(...)`**——「系統至少要保留一位啟用中的主管」。這條**跨多個使用者**，照 §4.2 本來會是 Domain Service，但本專案的使用者刻意不是 Domain 的一員（`ApplicationUser` 繼承 Identity 型別、住 Infrastructure，Domain 只用 Guid 參照人）。要放進 Domain 就得先把使用者整個搬進去，代價遠大於一條規則。**這是誠實的例外，不是偷懶**，理由詳見 `docs/architecture/user-accounts.md`
 - `UserAccountAppService.DisableAsync(...)` / `SetRoleAsync(...)` 的緊急存取帳號檢查——同上，也需要先讀資料才知道那個帳號是不是受保護的
 - **`UserAccountResult` 為什麼不是例外**：建立帳號時「帳號重複 + Email 重複 + 密碼太短」可能同時發生，Identity 本來就回一整包，用例外只能丟第一條；也順帶擋住 `IdentityResult` 漏進 Application。分界線是「使用者自己能修正的走 result 進 ModelState，違反業務規則的（最後一位主管、緊急帳號、找不到帳號）照舊丟例外」
+- **首次登入強制改密碼的三個寫入點**（2026-08-16）——旗標本身放 `ApplicationUser.RequirePasswordChange`（Infrastructure），寫入邏輯放最靠近 Identity 的一層（`IdentityUserAccountStore` / `IdentityBootstrapper`），不下沉到 `UserAccountAppService`。理由：三個入口共通的判斷是「這個密碼是不是本人給的」——`CreateAsync`、`ResetPasswordAsync` 就是「別人給的」設 true、`ChangePasswordAsync` 成功時就是「本人自己給的」清 false，跟 `PasswordHash`、`SecurityStamp` 這類「跟密碼一體」的狀態一樣屬於 store 職責。App Service 不需要知道這個旗標。詳見 `docs/architecture/user-accounts.md`
 
 授權的分層落點（理由詳見 `docs/architecture/authorization.md`）：
 
@@ -470,19 +474,20 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 5. ✅ **員工只看自己的報銷單**——列表、詳情、修改頁、專案詳情頁的相關報銷單與統計數字都依 `ApplicantUserId` 過濾，主管看全部
 6. ✅ **帳號與使用者管理**——登入先驗密碼再判狀態、使用者管理頁（啟用 / 停用 / 改角色 / 重設密碼）、修改密碼頁、bootstrap 取代 seed，外加緊急存取帳號與登入告警
 
-**6 之後的修正（2026-08-08、2026-08-09、2026-08-12）**：
+**6 之後的修正（2026-08-08、2026-08-09、2026-08-12、2026-08-16）**：
 
 - ✅ 拿掉自助註冊改成主管建帳號、帳號狀態收斂為兩態（2026-08-08）。理由見〈已定案的設計決策 / 帳號生命週期〉。
 - ✅ 補上「審核人 ≠ 申請人」規則（2026-08-08）。主管自己送的單只能由另一位主管審。**前提是這間公司實際上有兩位主管**（老闆 + 老闆娘）；若哪天只剩一位在動的主管，他自己的單就沒人能審、也沒人能作廢，那時候需重新設計（「主管的單免審」或「必須另一位主管核」都得先決定制度）。〈應用面候補〉裡「只剩一位主管時給提示」就是為這情境留的預警。
 - ✅ **報銷單生命週期擴充**（2026-08-09）：主管作廢已核准單 + 申請人硬刪草稿 + 申請人軟刪退回單 + 復活。詳見〈已定案的設計決策 / 報銷單生命週期擴充〉與 `docs/architecture/expense-report-lifecycle.md`。**已於同日手動驗完 A（草稿硬刪）/ B（軟刪＋復活）/ C（作廢已核准單，含作廢前的黃色警告 + 作廢後在報銷單頁 + 預支款頁的持續提示兩個時機）/ D（Delete 與 Void 側門）**，四塊全過、沒發現 bug。
 - ✅ **預支款已結清後鎖定**（2026-08-12）：預支款主檔、結清紀錄修改、標記不採用全部鎖住。Amber 已手動測過目前功能可正常使用。詳見〈已定案的設計決策 / 結清紀錄〉與 `docs/architecture/cash-advance-reconciliation.md`。
 - ✅ **修正 `/Projects` 專案列表錯誤**（2026-08-12）：`EfExpenseReportRepository` 的未完成報銷單統計改成 EF 可翻譯的 enum whitelist 條件，修掉 `IsUnfinished(...) could not be translated`。
+- ✅ **首次登入強制改密碼**（2026-08-16）：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」入口在 `ApplicationUser.RequirePasswordChange` 設 true；本人成功改密碼時清 false。`RequirePasswordChangeMiddleware` 全站攔截，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 ChangePassword。順帶改動 `AccountController.ChangePassword`：成功後刻意 SignOut 並跳登入頁（避免 UX 陷阱）。詳見 `docs/architecture/user-accounts.md`。
 
 ### 應用面候補（尚未排序）
 
-- **首次登入強制改密碼**：主管建帳號時知道對方的初始密碼，目前只能靠文案提醒本人去改。做法是在 `ApplicationUser` 加一個旗標 + 全站攔截，2026-08-08 判斷是獨立功能所以先不做（見〈已知缺口〉）。
+- **UI / 美編整體檢視**：目前 Bootstrap 預設樣式，色塊感偏淡（例如 `alert-warning` Amber 手動驗證時反映「沒有色塊」——實際 markup 正確、只是預設淡黃底不夠鮮明）。Amber 決定等專案功能全部完成後**整批重新設計美編**，本項作為統一入口。**新增功能時繼續用 Bootstrap 標準 class，別為單一頁面自訂顏色。**
 - **附件 / 發票照片上傳**：會牽涉檔案儲存、安全性與大小限制。
-- **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定，可等手動驗收時一併感受。
+- **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定，可等美編重整時一併感受。
 - **只剩一位主管時給提示**：目前「至少一位啟用中的主管」只在你想拿掉他的當下才擋。**2026-08-08 加了「審核人 ≠ 申請人」之後這件事變得更急**——只剩一位主管時他自己的單就核不了（現在還多一條：他自己的已核准單也沒人能作廢）。要不要在使用者管理頁平時就顯示警告（提醒指派第二位主管），Amber 尚未決定。
 - 若未來真的要做沖銷、付款憑證或出納日記帳，需另開會計帳範圍設計，**不建議混進第一階段**。
 

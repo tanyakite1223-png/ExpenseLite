@@ -31,4 +31,12 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     /// null 代表從來沒登入成功過。
     /// </summary>
     public DateTime? LastSignedInAt { get; set; }
+
+    /// <summary>
+    /// 是否強制要求本人先改密碼才能繼續使用。
+    /// 主管建帳號、主管替別人重設密碼、bootstrap 建立第一個帳號時會設 true——
+    /// 這幾條路的預設密碼都是別人給的，本人第一次登入必須換掉。
+    /// 本人自己在「修改密碼」頁改成功時會被清成 false。
+    /// </summary>
+    public bool RequirePasswordChange { get; set; }
 }

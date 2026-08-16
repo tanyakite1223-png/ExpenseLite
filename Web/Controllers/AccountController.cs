@@ -142,17 +142,14 @@ public sealed class AccountController : Controller
             return View(form);
         }
 
-        // 改密碼會換掉 security stamp，手上這張 cookie 在下一次驗證時就會失效。
-        // 這裡主動換一張新的，否則「改完自己的密碼」會變成把自己踢出去。
-        var user = await _userManager.GetUserAsync(User);
-        if (user is not null)
-        {
-            await _signInManager.RefreshSignInAsync(user);
-        }
+        // 改完密碼刻意登出、回到登入頁請本人用新密碼重登，理由是 UX：
+        // 若停在原頁，密碼欄位還在，使用者容易誤以為「還沒改成功、要再改一次」。
+        // 順帶讓「首次強制改密碼」的流程一致——不管是強制或主動，改完都用新密碼登一次。
+        await _signInManager.SignOutAsync();
 
-        TempData["SuccessMessage"] = "密碼已更新。";
+        TempData["SuccessMessage"] = "密碼已更新，請用新密碼重新登入。";
 
-        return RedirectToAction(nameof(ChangePassword));
+        return RedirectToAction(nameof(Login));
     }
 
     [AllowAnonymous]

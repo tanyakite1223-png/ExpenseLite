@@ -5,6 +5,7 @@ using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure;
 using ExpenseLite.Infrastructure.Identity;
 using ExpenseLite.Web.Filters;
+using ExpenseLite.Web.Middleware;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -63,6 +64,10 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// 已登入但被要求先改密碼的人，除 ChangePassword / Logout 之外全部導到修改密碼頁。
+// 掛在 Authorization 之後：授權該擋的先擋掉（避免匿名或無權限的請求被誤導到 ChangePassword）。
+app.UseMiddleware<RequirePasswordChangeMiddleware>();
 
 app.MapStaticAssets();
 

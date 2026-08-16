@@ -32,6 +32,13 @@ public static class ClaimsPrincipalExtensions
         => principal.HasClaim(ExpenseLiteClaimTypes.ProtectedAccount, "true");
 
     /// <summary>
+    /// 是否被要求先改密碼。給攔截 middleware 用；本人改完密碼後 <c>RefreshSignInAsync</c>
+    /// 會重新產 claim（此時值變成 false），middleware 下一次就會放行。
+    /// </summary>
+    public static bool MustChangePassword(this ClaimsPrincipal principal)
+        => principal.HasClaim(ExpenseLiteClaimTypes.RequirePasswordChange, "true");
+
+    /// <summary>
     /// 把登入 cookie 裡的身分轉成 Application 看得懂的 <see cref="CurrentUser"/>。
     /// 全站預設需要登入，所以走到這裡還沒有 UserId 代表程式接錯了，直接丟例外而不是靜靜吞掉。
     /// </summary>

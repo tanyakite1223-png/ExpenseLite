@@ -39,6 +39,9 @@ internal static class IdentityModelConfiguration
                 .IsRequired();
 
             builder.Property(x => x.LastSignedInAt);
+
+            builder.Property(x => x.RequirePasswordChange)
+                .IsRequired();
         });
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

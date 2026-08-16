@@ -105,7 +105,10 @@ public static class IdentityBootstrapper
             Status = UserAccountStatus.Active,
             // 緊急存取帳號（break-glass）：不能被停用、也不能降成員工。
             // 這是全系統唯一會設這個旗標的地方。
-            IsProtected = true
+            IsProtected = true,
+            // Identity:SeedPassword 是部署者填的初始密碼，本人第一次登入必須換掉——
+            // 跟主管建帳號同一條紅線：不讓「別人給的密碼」一直被使用。
+            RequirePasswordChange = true
         };
 
         var createResult = await userManager.CreateAsync(user, password);
