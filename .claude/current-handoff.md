@@ -3,7 +3,7 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-16 — 完成四件（同日）：(1) 首次登入強制改密碼(詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼))；(2) 只剩一位日常主管時給紅色 alert 提示——使用者管理頁頂端；(3) 主管不能停用 / 降級自己(詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動))；(4) **列印報表**——`/ExpenseReports/Print?from=&to=`，區間查詢已核准報銷單，頂部四分組總表（按申請人 / 支出類型 / 付款方式 / 專案）+ 底部依申請人分卡的詳情。用途：員工整理送出納、主管看月度支出，同一頁靠 visibility 分視角。用 `@media print` CSS + `window.print()` 觸發列印，零套件。全部功能通過 build 與手動驗證。migration 只新增 `AddRequirePasswordChange`（其他三件無 schema 變動）。
+> 最後更新：2026-08-16 — 完成四件（同日）：(1) 首次登入強制改密碼(詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼))；(2) 只剩一位日常主管時給紅色 alert 提示(詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示))；(3) 主管不能停用 / 降級自己(詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動))；(4) **列印報表**——`/ExpenseReports/Print?from=&to=`，區間查詢已核准報銷單，頂部四分組總表（按申請人 / 支出類型 / 付款方式 / 專案）+ 底部依申請人分卡的詳情。用途：員工整理送出納、主管看月度支出，同一頁靠 visibility 分視角。用 `@media print` CSS + `window.print()` 觸發列印，零套件。全部功能通過 build 與手動驗證。migration 只新增 `AddRequirePasswordChange`（其他三件無 schema 變動）。
 
 ---
 
@@ -23,7 +23,7 @@
 - **首次登入強制改密碼**（2026-08-16）—— 詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
 - **系統至少保留一位啟用中的主管**：停用最後一位主管、把最後一位主管降成員工，兩個入口都擋
 - **主管不能對自己動**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
-- **只剩一位日常主管時給紅色 alert（2026-08-16）**：使用者管理頁頂端。「日常主管」= 啟用中的主管**扣掉緊急存取帳號**（Admin 不算，理由：靠緊急帳號撐日常審核違反該帳號定位；算它就永遠不會觸發，提示等於沒用）。0 位、1 位分別顯示不同訊息。用 `alert-danger` 而非 warning，因為觸發條件是「流程已卡 / 快卡」不是「你可能想注意」
+- **只剩一位日常主管時給紅色 alert**（2026-08-16）—— 詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
 - **緊急存取帳號（break-glass）**：bootstrap 建的 `Admin` 帶 `IsProtected`，不能停用、不能降級；登入時留 warning log、掛畫面橫幅、更新 `last_signed_in_at`
 - **Bootstrap 取代 seed**：角色每次開機確認；帳號只在 users 表為空時建一個主管 `Admin`，不再建 demo 帳號。自助註冊拿掉之後，**這是系統裡唯一「憑空生出帳號」的地方**——沒設 `Identity:SeedPassword` 的新環境就是真的沒有人進得去，沒有備援路徑
 - Identity 的英文錯誤訊息由 `ChineseIdentityErrorDescriber` 換成中文（只換句子，不改驗證規則）
@@ -223,7 +223,7 @@
 - **`UserAccountAppService.EnsureNotLastActiveManagerAsync(...)`**——「系統至少要保留一位啟用中的主管」。這條**跨多個使用者**，照 §4.2 本來會是 Domain Service，但本專案的使用者刻意不是 Domain 的一員（`ApplicationUser` 繼承 Identity 型別、住 Infrastructure，Domain 只用 Guid 參照人）。要放進 Domain 就得先把使用者整個搬進去，代價遠大於一條規則。**這是誠實的例外，不是偷懶**，理由詳見 `docs/architecture/user-accounts.md`
 - `UserAccountAppService.DisableAsync(...)` / `SetRoleAsync(...)` 的緊急存取帳號檢查——同上，也需要先讀資料才知道那個帳號是不是受保護的
 - **`UserAccountAppService.DisableAsync` / `SetRoleAsync` 的「不能對自己動」檢查** —— 〈邏輯落點〉見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
-- **`UserAccountAppService.CountActiveDailyManagersAsync`（2026-08-16）**——算「啟用中的主管扣掉緊急存取帳號」；用途是使用者管理頁的紅色 alert。定義集中在 App Service，View 只判斷 `<= 1` 是否顯示，不重寫規則
+- **`UserAccountAppService.CountActiveDailyManagersAsync`** —— 〈邏輯落點〉見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
 - **`UserAccountResult` 為什麼不是例外**：建立帳號時「帳號重複 + Email 重複 + 密碼太短」可能同時發生，Identity 本來就回一整包，用例外只能丟第一條；也順帶擋住 `IdentityResult` 漏進 Application。分界線是「使用者自己能修正的走 result 進 ModelState，違反業務規則的（最後一位主管、緊急帳號、找不到帳號）照舊丟例外」
 - **首次登入強制改密碼的三個寫入點** —— 〈邏輯落點〉見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
 
@@ -508,7 +508,7 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 - ✅ **預支款已結清後鎖定**（2026-08-12）：預支款主檔、結清紀錄修改、標記不採用全部鎖住。Amber 已手動測過目前功能可正常使用。詳見〈已定案的設計決策 / 結清紀錄〉與 `docs/architecture/cash-advance-reconciliation.md`。
 - ✅ **修正 `/Projects` 專案列表錯誤**（2026-08-12）：`EfExpenseReportRepository` 的未完成報銷單統計改成 EF 可翻譯的 enum whitelist 條件，修掉 `IsUnfinished(...) could not be translated`。
 - ✅ **首次登入強制改密碼**（2026-08-16）—— 詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
-- ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）：使用者管理頁頂端。「日常主管」= 啟用中的主管扣掉緊急存取帳號。用 `alert-danger`（不是 warning），因為觸發條件是「流程已卡 / 快卡」不是提醒。詳見 `docs/architecture/user-accounts.md` 的〈只剩一位日常主管時的提示〉。
+- ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）—— 詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
 - ✅ **主管不能停用 / 降級自己**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
 - ✅ **列印報表**（2026-08-16）：`/ExpenseReports/Print?from=&to=` 一頁兩用——員工整理已核准報銷單交出納對照、主管看月度全公司支出。頂部 4 分組總表（員工版隱藏「按申請人」）+ 底部依申請人分卡。`@media print` CSS + `window.print()`，零 NuGet 套件。詳見〈已完成功能 / 列印報表〉與 `docs/architecture/list-filtering-queries.md` 的〈列印報表：同一種思路的另一個例子〉。
 
