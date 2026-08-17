@@ -3,7 +3,8 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-16 — 完成四件（同日）：(1) 首次登入強制改密碼(詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼))；(2) 只剩一位日常主管時給紅色 alert 提示(詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示))；(3) 主管不能停用 / 降級自己(詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動))；(4) **列印報表**——`/ExpenseReports/Print?from=&to=`，區間查詢已核准報銷單，頂部四分組總表（按申請人 / 支出類型 / 付款方式 / 專案）+ 底部依申請人分卡的詳情。用途：員工整理送出納、主管看月度支出，同一頁靠 visibility 分視角。用 `@media print` CSS + `window.print()` 觸發列印，零套件。全部功能通過 build 與手動驗證。migration 只新增 `AddRequirePasswordChange`（其他三件無 schema 變動）。
+> 最後更新：2026-08-17 — **筆記體系優化**:Diátaxis 收乾實驗第一輪(3 主題 / 13 處,75,513→72,866 bytes / -3.5%),**尚未完成**,詳見 [notes-Diataxis實驗.md](notes-Diataxis實驗.md)。
+> 前次:2026-08-16 完成四件功能(首次登入強制改密碼、只剩一位日常主管紅色 alert、主管不能對自己動、列印報表),細節見〈已完成功能〉與各對應 architecture 檔。
 
 ---
 
