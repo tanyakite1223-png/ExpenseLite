@@ -3,7 +3,7 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-16 — 完成四件（同日）：(1) 首次登入強制改密碼——主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」都會逼本人下次登入時換掉，用 middleware 攔在全站；本人成功改完密碼後刻意 SignOut 並跳回登入頁（避免使用者在原頁看到密碼欄位以為「還沒改成功」）；(2) 只剩一位日常主管時給紅色 alert 提示——使用者管理頁頂端；(3) 主管不能停用 / 降級自己——App Service 擋 + UI 對 `isSelf` 不畫按鈕；(4) **列印報表**——`/ExpenseReports/Print?from=&to=`，區間查詢已核准報銷單，頂部四分組總表（按申請人 / 支出類型 / 付款方式 / 專案）+ 底部依申請人分卡的詳情。用途：員工整理送出納、主管看月度支出，同一頁靠 visibility 分視角。用 `@media print` CSS + `window.print()` 觸發列印，零套件。全部功能通過 build 與手動驗證。migration 只新增 `AddRequirePasswordChange`（其他三件無 schema 變動）。
+> 最後更新：2026-08-16 — 完成四件（同日）：(1) 首次登入強制改密碼(詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼))；(2) 只剩一位日常主管時給紅色 alert 提示——使用者管理頁頂端；(3) 主管不能停用 / 降級自己(詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動))；(4) **列印報表**——`/ExpenseReports/Print?from=&to=`，區間查詢已核准報銷單，頂部四分組總表（按申請人 / 支出類型 / 付款方式 / 專案）+ 底部依申請人分卡的詳情。用途：員工整理送出納、主管看月度支出，同一頁靠 visibility 分視角。用 `@media print` CSS + `window.print()` 觸發列印，零套件。全部功能通過 build 與手動驗證。migration 只新增 `AddRequirePasswordChange`（其他三件無 schema 變動）。
 
 ---
 
@@ -20,9 +20,9 @@
 - **登入先驗密碼、再判帳號狀態**。用 `CheckPasswordSignInAsync` 只驗密碼不發 cookie，保留登入失敗鎖定；通過後才 `SignInAsync`。（狀態訊息只剩「已停用」一種，但這個順序仍然要維持——有差異就推得出帳號是否存在）
 - **使用者管理頁（限主管）**：新增使用者（可直接指定角色，建立即可登入）/ 啟用 / 停用 / 在員工與主管之間改角色 / 重設別人的密碼
 - **修改密碼頁**（每個人改自己的，要驗舊密碼）。**成功後刻意 `SignOutAsync` 並跳回登入頁**，訊息用 `TempData` 帶到登入頁上顯示——避免留在原頁時密碼欄位還在、讓使用者以為「還沒改成功要再改一次」。首次強制與主動修改走同一條收尾路徑。
-- **首次登入強制改密碼（2026-08-16）**：`ApplicationUser.RequirePasswordChange` bool。三條「別人給的密碼」入口設 true：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin`；本人成功改自己密碼時清成 false。`RequirePasswordChangeMiddleware` 掛在 `UseAuthorization` 之後，已登入且旗標為 true 時，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 `/Account/ChangePassword`。旗標透過 `require_password_change` claim 承載（factory 登入時寫入），middleware 不用每個 request 查 DB。
+- **首次登入強制改密碼**（2026-08-16）—— 詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
 - **系統至少保留一位啟用中的主管**：停用最後一位主管、把最後一位主管降成員工，兩個入口都擋
-- **主管不能對自己動（2026-08-16）**：不能停用自己、不能把自己降成員工。順序放在「最後一位主管」之前，訊息更精確。View 對 `isSelf` 那一列不畫「停用」與「改為員工」按鈕，「改為主管」不擋（升不會造成鎖死）
+- **主管不能對自己動**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
 - **只剩一位日常主管時給紅色 alert（2026-08-16）**：使用者管理頁頂端。「日常主管」= 啟用中的主管**扣掉緊急存取帳號**（Admin 不算，理由：靠緊急帳號撐日常審核違反該帳號定位；算它就永遠不會觸發，提示等於沒用）。0 位、1 位分別顯示不同訊息。用 `alert-danger` 而非 warning，因為觸發條件是「流程已卡 / 快卡」不是「你可能想注意」
 - **緊急存取帳號（break-glass）**：bootstrap 建的 `Admin` 帶 `IsProtected`，不能停用、不能降級；登入時留 warning log、掛畫面橫幅、更新 `last_signed_in_at`
 - **Bootstrap 取代 seed**：角色每次開機確認；帳號只在 users 表為空時建一個主管 `Admin`，不再建 demo 帳號。自助註冊拿掉之後，**這是系統裡唯一「憑空生出帳號」的地方**——沒設 `Identity:SeedPassword` 的新環境就是真的沒有人進得去，沒有備援路徑
@@ -155,7 +155,7 @@
 - **`Application/Shared/ForbiddenOperationException`** 與 `DomainRuleViolationException` 分開，由 `Web/Filters/ForbiddenOperationExceptionFilter` 轉成 HTTP 403
 - **`Application/Identity/UserAccountResult`**——帳號操作的結果物件。存在理由見〈邏輯落點〉，不是隨手多包一層
 - **報銷單生命週期的完整狀態機**（2026-08-09）：7 個狀態、4 個 review action、申請人動作（`Submit/Cancel/Restore` + 硬刪草稿）與審核人動作（`Return/Approve/Reject/Void`）分開命名慣例——申請人動作無參數，審核人動作帶 reviewer 資訊。詳見 `docs/architecture/expense-report-lifecycle.md`
-- **`RequirePasswordChangeMiddleware`**（2026-08-16）——全站閘門，攔已登入但被要求先改密碼的人到 `/Account/ChangePassword`；用 middleware 而不是 MVC filter，跟「全站預設要登入」是同一種安全預設（filter 得每個 controller 標一次，漏一個就是缺口）。允許路徑白名單只有 `ChangePassword` 與 `Logout` 兩條。詳見 `docs/architecture/user-accounts.md` 的〈首次登入強制改密碼〉
+- **`RequirePasswordChangeMiddleware`**（2026-08-16）—— 全站閘門，首次登入強制改密碼用。詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
 - **`PrintReportDto` 頁面 DTO + `@media print` 列印**（2026-08-16）——延伸「列表查詢頁面 DTO 由 App Service 組裝」的既有 pattern，另外多做兩件事：(a) 分組聚合（4 個維度小計 + 總計）在 App Service 一次算完、不下沉到 view；(b) 分組 label 的中文化也在 App Service（`ExpenseTypeLabel` / `PaymentMethodLabel` 小 helper），避免每個 view 各寫一套。View 只負責 `@media print` CSS 與 `window.print()` 觸發。零 NuGet 套件
 
 ### Web 層目錄慣例
@@ -222,10 +222,10 @@
 - **「未完成報銷單」判定全面改成 whitelist**（2026-08-09）：原本用 blacklist 排除 Approved/Rejected，改成明列 Draft/Submitted/Returned。三處都改：`EfExpenseReportRepository.CountUnfinishedProjectReportsAsync` / `HasUnfinishedProjectReportsAsync`、`ProjectAppService.CountUnfinishedReports`。動機：新增狀態時**預設不算未完成**比較安全（Voided/Cancelled 都不流動了，就不該算未完成）。**2026-08-12 修正實作細節**：repository 的 `IQueryable` 不能呼叫私有 C# helper method，whitelist 條件要直接寫在 LINQ expression 裡，否則 `/Projects` 會發生 EF Core LINQ translation error。
 - **`UserAccountAppService.EnsureNotLastActiveManagerAsync(...)`**——「系統至少要保留一位啟用中的主管」。這條**跨多個使用者**，照 §4.2 本來會是 Domain Service，但本專案的使用者刻意不是 Domain 的一員（`ApplicationUser` 繼承 Identity 型別、住 Infrastructure，Domain 只用 Guid 參照人）。要放進 Domain 就得先把使用者整個搬進去，代價遠大於一條規則。**這是誠實的例外，不是偷懶**，理由詳見 `docs/architecture/user-accounts.md`
 - `UserAccountAppService.DisableAsync(...)` / `SetRoleAsync(...)` 的緊急存取帳號檢查——同上，也需要先讀資料才知道那個帳號是不是受保護的
-- **`UserAccountAppService.DisableAsync` / `SetRoleAsync` 的「不能對自己動」檢查（2026-08-16）**——接 `CurrentUser actor` 參數，比對 `userId == actor.UserId`；順序放在「最後一位主管」之前，讓撞到的人拿到更精確的訊息。跟緊急存取帳號的檢查是同一類「業務規則，不是授權」（主管有權限，只是這次資料不合法），丟 `DomainRuleViolationException`
+- **`UserAccountAppService.DisableAsync` / `SetRoleAsync` 的「不能對自己動」檢查** —— 〈邏輯落點〉見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
 - **`UserAccountAppService.CountActiveDailyManagersAsync`（2026-08-16）**——算「啟用中的主管扣掉緊急存取帳號」；用途是使用者管理頁的紅色 alert。定義集中在 App Service，View 只判斷 `<= 1` 是否顯示，不重寫規則
 - **`UserAccountResult` 為什麼不是例外**：建立帳號時「帳號重複 + Email 重複 + 密碼太短」可能同時發生，Identity 本來就回一整包，用例外只能丟第一條；也順帶擋住 `IdentityResult` 漏進 Application。分界線是「使用者自己能修正的走 result 進 ModelState，違反業務規則的（最後一位主管、緊急帳號、找不到帳號）照舊丟例外」
-- **首次登入強制改密碼的三個寫入點**（2026-08-16）——旗標本身放 `ApplicationUser.RequirePasswordChange`（Infrastructure），寫入邏輯放最靠近 Identity 的一層（`IdentityUserAccountStore` / `IdentityBootstrapper`），不下沉到 `UserAccountAppService`。理由：三個入口共通的判斷是「這個密碼是不是本人給的」——`CreateAsync`、`ResetPasswordAsync` 就是「別人給的」設 true、`ChangePasswordAsync` 成功時就是「本人自己給的」清 false，跟 `PasswordHash`、`SecurityStamp` 這類「跟密碼一體」的狀態一樣屬於 store 職責。App Service 不需要知道這個旗標。詳見 `docs/architecture/user-accounts.md`
+- **首次登入強制改密碼的三個寫入點** —— 〈邏輯落點〉見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
 
 授權的分層落點（理由詳見 `docs/architecture/authorization.md`）：
 
@@ -507,9 +507,9 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 - ✅ **報銷單生命週期擴充**（2026-08-09）：主管作廢已核准單 + 申請人硬刪草稿 + 申請人軟刪退回單 + 復活。詳見〈已定案的設計決策 / 報銷單生命週期擴充〉與 `docs/architecture/expense-report-lifecycle.md`。**已於同日手動驗完 A（草稿硬刪）/ B（軟刪＋復活）/ C（作廢已核准單，含作廢前的黃色警告 + 作廢後在報銷單頁 + 預支款頁的持續提示兩個時機）/ D（Delete 與 Void 側門）**，四塊全過、沒發現 bug。
 - ✅ **預支款已結清後鎖定**（2026-08-12）：預支款主檔、結清紀錄修改、標記不採用全部鎖住。Amber 已手動測過目前功能可正常使用。詳見〈已定案的設計決策 / 結清紀錄〉與 `docs/architecture/cash-advance-reconciliation.md`。
 - ✅ **修正 `/Projects` 專案列表錯誤**（2026-08-12）：`EfExpenseReportRepository` 的未完成報銷單統計改成 EF 可翻譯的 enum whitelist 條件，修掉 `IsUnfinished(...) could not be translated`。
-- ✅ **首次登入強制改密碼**（2026-08-16）：主管建帳號、主管重設別人密碼、bootstrap 建 `Admin` 三條「別人給的密碼」入口在 `ApplicationUser.RequirePasswordChange` 設 true；本人成功改密碼時清 false。`RequirePasswordChangeMiddleware` 全站攔截，除 `/Account/ChangePassword` 與 `/Account/Logout` 外全部 302 到 ChangePassword。順帶改動 `AccountController.ChangePassword`：成功後刻意 SignOut 並跳登入頁（避免 UX 陷阱）。詳見 `docs/architecture/user-accounts.md`。
+- ✅ **首次登入強制改密碼**（2026-08-16）—— 詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
 - ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）：使用者管理頁頂端。「日常主管」= 啟用中的主管扣掉緊急存取帳號。用 `alert-danger`（不是 warning），因為觸發條件是「流程已卡 / 快卡」不是提醒。詳見 `docs/architecture/user-accounts.md` 的〈只剩一位日常主管時的提示〉。
-- ✅ **主管不能停用 / 降級自己**（2026-08-16）：跟前一件同日順帶做的自我保護。App Service `DisableAsync` / `SetRoleAsync` 接 `CurrentUser actor` 比對 `userId == actor.UserId`；順序放在「最後一位主管」之前。View 對 `isSelf` 那一列不畫按鈕，「改為主管」不擋。詳見〈順帶擋掉「主管對自己動」〉。
+- ✅ **主管不能停用 / 降級自己**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
 - ✅ **列印報表**（2026-08-16）：`/ExpenseReports/Print?from=&to=` 一頁兩用——員工整理已核准報銷單交出納對照、主管看月度全公司支出。頂部 4 分組總表（員工版隱藏「按申請人」）+ 底部依申請人分卡。`@media print` CSS + `window.print()`，零 NuGet 套件。詳見〈已完成功能 / 列印報表〉與 `docs/architecture/list-filtering-queries.md` 的〈列印報表：同一種思路的另一個例子〉。
 
 ### 應用面候補（尚未排序）
