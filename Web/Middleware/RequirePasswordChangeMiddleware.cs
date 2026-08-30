@@ -14,7 +14,8 @@ public sealed class RequirePasswordChangeMiddleware
     private static readonly string[] AllowedPaths =
     {
         "/Account/ChangePassword",
-        "/Account/Logout"
+        "/Account/Logout",
+        "/Account/Login"
     };
 
     private readonly RequestDelegate _next;
