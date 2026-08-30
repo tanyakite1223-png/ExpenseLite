@@ -62,7 +62,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.MapStaticAssets().AllowAnonymous();
+app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthentication();
@@ -74,8 +74,7 @@ app.UseMiddleware<RequirePasswordChangeMiddleware>();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 
 app.Run();
