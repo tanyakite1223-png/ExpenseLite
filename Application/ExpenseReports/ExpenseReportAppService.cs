@@ -45,6 +45,12 @@ public sealed class ExpenseReportAppService
             .Select(x => MapListItem(x, projectNames.GetValueOrDefault(x.ProjectId ?? Guid.Empty)))
             .ToList();
 
+        var unfinishedCount = visible.Count(x =>
+            x.Status is ExpenseReportStatus.Draft or
+                ExpenseReportStatus.Submitted or
+                ExpenseReportStatus.Returned);
+        var awaitingReviewCount = visible.Count(x => x.Status == ExpenseReportStatus.Submitted);
+
         return new ExpenseReportListPageDto(
             normalizedKeyword,
             query.Status,
@@ -52,6 +58,8 @@ public sealed class ExpenseReportAppService
             query.PaymentMethod,
             query.IncludeCancelled,
             visible.Count,
+            unfinishedCount,
+            awaitingReviewCount,
             items);
     }
 

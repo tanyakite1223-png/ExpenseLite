@@ -25,7 +25,9 @@ public sealed record CashAdvanceListItemDto(
     CashAdvanceSettlementType? RequiredSettlementType,
     bool HasInProgressReports,
     bool IsSettled,
-    CashAdvanceReconciliationStatus ReconciliationStatus);
+    CashAdvanceReconciliationStatus ReconciliationStatus,
+    /// <summary>有幾張已作廢的報銷單掛在這筆預支款上，可能與已計入的結清紀錄對不上。</summary>
+    int VoidedRelatedReportCount);
 
 public sealed record CashAdvanceListQuery(
     string? Keyword,

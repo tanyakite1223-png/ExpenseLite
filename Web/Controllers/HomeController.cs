@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using ExpenseLite.Application.Home;
+using ExpenseLite.Application.Identity;
 using ExpenseLite.Web.ViewModels.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,9 +9,17 @@ namespace ExpenseLite.Web.Controllers;
 
 public class HomeController : Controller
 {
-    public IActionResult Index()
+    private readonly HomeAppService _home;
+
+    public HomeController(HomeAppService home)
     {
-        return View();
+        _home = home;
+    }
+
+    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    {
+        var page = await _home.GetPageAsync(User.ToCurrentUser(), cancellationToken);
+        return View(page);
     }
 
     public IActionResult Privacy()

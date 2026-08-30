@@ -33,6 +33,10 @@ public sealed record ExpenseReportListPageDto(
     ExpensePaymentMethod? PaymentMethod,
     bool IncludeCancelled,
     int TotalExpenseReportCount,
+    /// <summary>Draft + Submitted + Returned，依 viewer 可見度計算。</summary>
+    int UnfinishedCount,
+    /// <summary>Submitted，依 viewer 可見度計算。</summary>
+    int AwaitingReviewCount,
     IReadOnlyList<ExpenseReportListItemDto> Reports);
 
 public sealed record ExpenseReportDetailDto(

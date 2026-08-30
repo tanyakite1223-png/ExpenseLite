@@ -405,6 +405,7 @@ public sealed class CashAdvanceAppService
         var cashAdvances = await _cashAdvances.ListAsync(cancellationToken);
         var approvedAmounts = await GetApprovedAmountsByCashAdvanceAsync(cancellationToken);
         var inProgressCashAdvanceIds = await GetInProgressCashAdvanceIdsAsync(cancellationToken);
+        var voidedRelatedCounts = await GetVoidedRelatedReportCountsAsync(cancellationToken);
 
         // 先過濾可見度再算總筆數，「還沒有預支款」和「篩選條件沒中」才不會被別人的資料混淆。
         var visible = cashAdvances
@@ -417,7 +418,8 @@ public sealed class CashAdvanceAppService
             .Select(x => MapListItem(
                 x,
                 approvedAmounts.GetValueOrDefault(x.Id),
-                inProgressCashAdvanceIds.Contains(x.Id)))
+                inProgressCashAdvanceIds.Contains(x.Id),
+                voidedRelatedCounts.GetValueOrDefault(x.Id)))
             .ToList();
 
         return (visible.Count, items);
@@ -426,7 +428,8 @@ public sealed class CashAdvanceAppService
     private static CashAdvanceListItemDto MapListItem(
         CashAdvance cashAdvance,
         decimal approvedReimbursedAmount,
-        bool hasInProgressReports)
+        bool hasInProgressReports,
+        int voidedRelatedReportCount)
     {
         var settlement = BuildSettlementSummary(cashAdvance, approvedReimbursedAmount);
 
@@ -445,7 +448,8 @@ public sealed class CashAdvanceAppService
             settlement.RequiredSettlementType,
             hasInProgressReports,
             settlement.RemainingSettlementAmount == 0m,
-            settlement.ReconciliationStatus);
+            settlement.ReconciliationStatus,
+            voidedRelatedReportCount);
     }
 
     private static CashAdvanceOptionDto MapOption(
