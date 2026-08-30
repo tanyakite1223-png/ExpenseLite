@@ -35,7 +35,7 @@
 
 @functions {
     // 讓目前所在的模組在功能列上變青色。aria-current 同時也是無障礙標記。
-    private string? Current(string controller)
+    private string Current(string controller)
         => string.Equals(ViewContext.RouteData.Values["controller"] as string, controller, StringComparison.OrdinalIgnoreCase)
             ? "page" : null;
 }

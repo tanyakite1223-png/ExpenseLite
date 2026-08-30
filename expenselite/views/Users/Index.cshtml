@@ -150,15 +150,6 @@
         _ => "el-status--disabled"
     };
 
-    private static string LastSignInText(DateTime? lastSignedInAt)
-        => lastSignedInAt is null
-            ? "從未登入"
-            : lastSignedInAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
-
-    private static string StatusText(UserAccountStatus status) => status switch
-    {
-        UserAccountStatus.Active => "啟用中",
-        UserAccountStatus.Disabled => "已停用",
-        _ => status.ToString()
-    };
+    @* LastSignInText / StatusText 沿用原檔，未改動。
+       原本的 StatusBadgeClass 可以刪掉，改用上面的 StatusClass。 *@
 }

@@ -1,0 +1,27 @@
+@inject IConfiguration Config
+@{
+    var appName = Config["App:Name"] ?? "報銷系統";
+    var appTagline = Config["App:Tagline"] ?? "員工墊款、個人預支與零用金支付的申請、審核與核對。帳號由主管建立。";
+}
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — @appName</title>
+    <link rel="stylesheet" href="~/css/expenselite.css" asp-append-version="true" />
+</head>
+<body>
+<div class="el-login">
+    <div class="el-login-brand">
+        <h1 class="el-login-wordmark">@appName</h1>
+        <div class="el-rule"></div>
+        <p class="el-login-tagline">@appTagline</p>
+    </div>
+    <div class="el-login-panel">
+        @RenderBody()
+    </div>
+</div>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

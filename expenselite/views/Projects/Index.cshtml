@@ -98,15 +98,5 @@
 </div>
 
 @functions {
-    private static string StatusText(ProjectStatus status) => status switch
-    {
-        ProjectStatus.Active => "進行中",
-        ProjectStatus.Closed => "已結案",
-        _ => status.ToString()
-    };
-
-    private static string EmptyProjectMessage(ProjectListPageDto page)
-        => page.TotalProjectCount == 0
-            ? "目前還沒有專案。"
-            : "沒有符合關鍵字的專案。";
+    @* StatusText / EmptyProjectMessage 沿用原檔，未改動。 *@
 }

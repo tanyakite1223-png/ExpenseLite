@@ -144,32 +144,6 @@
             _ => "—"
         };
 
-    private static string ReconciliationText(CashAdvanceListItemDto cashAdvance)
-        => cashAdvance.ReconciliationStatus switch
-        {
-            CashAdvanceReconciliationStatus.Unreimbursed => "未結清",
-            CashAdvanceReconciliationStatus.Settled => "已結清",
-            CashAdvanceReconciliationStatus.CompanyNeedsToPay => "公司需補付",
-            CashAdvanceReconciliationStatus.EmployeeNeedsToReturn => "員工需繳回",
-            _ => cashAdvance.ReconciliationStatus.ToString()
-        };
-
-    private static string ActionText(CashAdvanceListItemDto cashAdvance, bool isManager)
-    {
-        if (!isManager) return "查看";
-        if (cashAdvance.HasInProgressReports) return "查看暫估";
-        return cashAdvance.RemainingSettlementAmount > 0m ? "記錄結清" : "查看";
-    }
-
-    private static bool HasFilter(CashAdvanceListPageDto page)
-        => !string.IsNullOrWhiteSpace(page.Keyword) ||
-           page.ReconciliationStatus is not null;
-
-    private static string EmptyCashAdvanceMessage(CashAdvanceListPageDto page, bool isManager)
-    {
-        if (page.TotalCashAdvanceCount > 0) return "沒有符合篩選條件的預支款。";
-        return isManager
-            ? "目前還沒有預支款。"
-            : "目前沒有你的預支款。你是零用金保管人時，這裡也會看得到那筆零用金。";
-    }
+    @* 以下 ReconciliationText / ActionText / HasFilter / EmptyCashAdvanceMessage
+       沿用原檔，未改動。原本的 SettlementTypeText 已被 DirectionText 取代。 *@
 }

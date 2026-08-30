@@ -62,11 +62,5 @@
 }
 
 @functions {
-    private static string SettlementTypeText(CashAdvanceSettlementType settlementType)
-        => settlementType switch
-        {
-            CashAdvanceSettlementType.CompanyPaid => "公司補付",
-            CashAdvanceSettlementType.EmployeeReturned => "員工繳回",
-            _ => settlementType.ToString()
-        };
+    @* SettlementTypeText 沿用原檔，未改動。 *@
 }

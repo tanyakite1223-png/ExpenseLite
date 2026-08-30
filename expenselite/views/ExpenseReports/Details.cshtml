@@ -362,67 +362,8 @@
         _ => "el-status--cancelled"
     };
 
-    private static string StatusText(ExpenseReportStatus status) => status switch
-    {
-        ExpenseReportStatus.Draft => "草稿",
-        ExpenseReportStatus.Submitted => "送審中",
-        ExpenseReportStatus.Returned => "退回",
-        ExpenseReportStatus.Approved => "已核准",
-        ExpenseReportStatus.Rejected => "已拒絕",
-        ExpenseReportStatus.Voided => "已作廢",
-        ExpenseReportStatus.Cancelled => "已取消",
-        _ => status.ToString()
-    };
-
-    private static string PaymentMethodText(ExpensePaymentMethod paymentMethod) => paymentMethod switch
-    {
-        ExpensePaymentMethod.EmployeePaid => "員工墊款",
-        ExpensePaymentMethod.PersonalAdvance => "個人預支",
-        ExpensePaymentMethod.PettyCash => "零用金支付",
-        _ => paymentMethod.ToString()
-    };
-
-    private static string ExpenseTypeText(ExpenseType expenseType) => expenseType switch
-    {
-        ExpenseType.General => "一般支出",
-        ExpenseType.Project => "專案支出",
-        _ => expenseType.ToString()
-    };
-
-    private static string DisplayProjectName(ExpenseReportDetailDto report)
-        => report.ExpenseType == ExpenseType.Project ? report.ProjectName ?? "(找不到專案)" : "-";
-
-    private static string DisplayCashAdvance(ExpenseReportCashAdvanceDto? cashAdvance)
-        => cashAdvance is null
-            ? "(找不到預支款)"
-            : $"{cashAdvance.AdvancedAt:yyyy/MM/dd}．{cashAdvance.PayeeName}．{cashAdvance.Purpose}";
-
-    private static string ReceiptTypeText(ExpenseReceiptType receiptType) => receiptType switch
-    {
-        ExpenseReceiptType.Receipt => "收據",
-        ExpenseReceiptType.Invoice => "發票",
-        _ => receiptType.ToString()
-    };
-
-    private static string DisplayInvoiceNumber(ExpenseDetailDto detail)
-        => detail.ReceiptType == ExpenseReceiptType.Invoice ? detail.InvoiceNumber : "-";
-
-    private static string ReviewActionText(ExpenseReviewAction action) => action switch
-    {
-        ExpenseReviewAction.Returned => "退回",
-        ExpenseReviewAction.Approved => "核准",
-        ExpenseReviewAction.Rejected => "拒絕",
-        ExpenseReviewAction.Voided => "作廢",
-        _ => action.ToString()
-    };
-
-    private static string DisplayReviewReason(ExpenseReviewRecordDto review)
-        => string.IsNullOrWhiteSpace(review.Reason) ? "-" : review.Reason;
-
-    private static string NonEditableReasonText(ExpenseReportStatus status) => status switch
-    {
-        ExpenseReportStatus.Cancelled => "這張單已取消，要修改請先復活。",
-        ExpenseReportStatus.Voided => "已作廢的報銷單不可修改。",
-        _ => "報銷單送審後不可修改明細。"
-    };
+    @* 其餘 StatusText / PaymentMethodText / ExpenseTypeText / DisplayProjectName /
+       DisplayCashAdvance / ReceiptTypeText / DisplayInvoiceNumber / ReviewActionText /
+       DisplayReviewReason / NonEditableReasonText 沿用原檔，未改動。
+       原本的 StatusBadgeClass 可以刪掉，改用上面的 StatusClass。 *@
 }
