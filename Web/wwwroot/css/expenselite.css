@@ -510,7 +510,6 @@ textarea.input { min-height: 90px; resize: vertical; }
 .el-page{overflow-x:auto}
 /* 側欄裡的明細表跟著主欄寬度走，不另外撐出捲軸 */
 .el-split .el-table--details{min-width:0}
-
 /* 每列之間多一點呼吸，掃列時不容易看錯行 */
 .el-table td{padding-top:11px;padding-bottom:11px;vertical-align:top}
 .el-table td .tag{vertical-align:top}
@@ -775,7 +774,7 @@ textarea.input.el-desc{min-height:66px}
 /* 同一格裡並排的兩個值（方向與金額） */
 .el-facts .pair{display:inline-flex;gap:var(--space-3);align-items:baseline}
 .el-facts .num{font-variant-numeric:tabular-nums}
-/* 值是整句說明而非短欄位時，放寬到一般讀行長度 */
+/* 寬版變體：放整句說明用（資料使用說明頁）。短值欄位不要加這個，寬了反而鬆散。 */
 .el-facts--prose{max-width:none;grid-template-columns:112px minmax(0,68ch)}
 .el-facts--prose dd{line-height:1.7}
 
@@ -862,6 +861,7 @@ textarea.input.el-desc{min-height:66px}
   .el-nav,.el-rule,.no-print{display:none !important}
   body{background:#fff}
   .el-page{padding:0;overflow-x:visible}
+  /* 列印時取消最小寬度，否則寬表格右側會被裁切 */
   .el-table{min-width:0 !important}
   /* 網頁的青色連結在黑白印表機上是淺灰，全部轉回墨色 */
   a{color:var(--color-text) !important;text-decoration:none}

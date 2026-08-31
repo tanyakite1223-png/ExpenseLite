@@ -4,6 +4,12 @@
 
 依序做完 A → B → C 三段即可。
 
+> **若已經套用過完整版，這輪只要看 `UPDATE-2026-08-31.md`**（複製 3 支檔案 ＋ 改 `appsettings.json` 一行）。
+>
+> **第一次套用，已知會踩到的兩個坑，先讀 `FIX-STATIC-FILES.md`。**
+> 一是靜態檔案被 fallback authorization policy 擋住（畫面完全沒有樣式）；
+> 二是整份覆蓋 view 會弄掉原檔 `@functions` 裡的方法（`CS0103`），該文件附了逐檔補回清單。
+
 ---
 
 ## A. 套用檔案（純複製，不需要判斷）
@@ -14,6 +20,7 @@
 | --- | --- |
 | `expenselite.css` | `Web/wwwroot/css/expenselite.css` |
 | `wwwroot-js/el-password-strength.js` | `Web/wwwroot/js/el-password-strength.js` |
+| `wwwroot-js/el-password-toggle.js` | `Web/wwwroot/js/el-password-toggle.js` |
 
 ### A2. Razor view
 
@@ -50,7 +57,19 @@ views/Users/ResetPassword.cshtml         → …
 
 `_ViewImports.cshtml`、`_ViewStart.cshtml`、`_ValidationScriptsPartial.cshtml` 不用動。
 
-### A3. 刪掉不再需要的東西
+### A3. 讓靜態檔案不需驗證（否則畫面完全沒有樣式）
+
+`Program.cs` 用了 `SetFallbackPolicy(RequireAuthenticatedUser())`——全站預設要登入。這會套到靜態檔案端點上，導致 `/css/expenselite.css` 被要求登入，連登入頁自己都拿不到樣式。
+
+改一行：
+
+```csharp
+app.MapStaticAssets().AllowAnonymous();
+```
+
+改完**重啟伺服器**，熱重載無效。詳細說明與驗收步驟見 `FIX-STATIC-FILES.md`。
+
+### A4. 刪掉不再需要的東西
 
 - `Web/Views/Shared/_Layout.cshtml.css` — ASP.NET scoped CSS，跟單檔做法衝突，整個刪除。
 - 覆蓋後，這三支的 `@functions` 裡有被新 mapper 取代的舊方法，若編譯器沒警告也請一併確認已消失（整份覆蓋的話它們自然不存在）：
@@ -58,23 +77,32 @@ views/Users/ResetPassword.cshtml         → …
   - `Users/Index.cshtml` 的 `StatusBadgeClass` → 已改用 `StatusClass`
   - `CashAdvances/Details.cshtml` 的 `SettlementRecordRowClass` → 已改用 `.el-settle-row--voided`
 - `Print.cshtml` 原本 view 內的 `<style>` 區塊已搬進 `expenselite.css` 的 `@media print`，不要留舊的。
+- **`expenselite/` 這個資料夾本身**——複製完就刪掉。它裡面的 `.cshtml` 沒有 `_ViewImports`，被編譯會噴一堆 `CS0246 找不到型別`。
 
-### A4. Bootstrap
+### A5. 補回原檔 `@functions` 的方法（否則編譯不過）
+
+交付的 view 在 `@functions` 只寫了新增的 mapper，其餘用註解標示「沿用原檔」。整份覆蓋後那些方法就不存在了，會噴 `CS0103 名稱 'XXX' 不存在於目前的內容中`。
+
+用 git 從覆蓋前的版本取回，逐檔貼回 `@functions`。**完整清單在 `FIX-STATIC-FILES.md`。**
+
+### A6. Bootstrap
 
 `expenselite.css` 最後有一層 Bootstrap 相容層（`.form-control` / `.alert` / `.badge` / `.btn-outline-*`），所以 Bootstrap CSS 可以先留著不會衝突。確認畫面正常後再移除 Bootstrap CSS，JS 若有用到 dropdown/modal 則保留。
 
-### A5. appsettings.json
+### A7. appsettings.json
 
 把 `appsettings.snippet.json` 的內容併進 `appsettings.json`：
 
 ```json
 "App": {
-  "Name": "ExpenseLite",
-  "Tagline": "員工墊款、個人預支與零用金支付的申請、審核與核對。帳號由主管建立。"
+  "Name": "報銷系統",
+  "Tagline": "員工墊款、個人預支與零用金支付的申請、審核與核對。\n帳號由主管建立。"
 }
 ```
 
-兩支 Layout 用 `@inject IConfiguration Config` 讀它，涵蓋功能列字標、登入頁字標、`<title>`、登入頁副標。讀不到時 fallback 為 `"ExpenseLite"`。
+兩支 Layout 用 `@inject IConfiguration Config` 讀它，涵蓋功能列字標、登入頁字標、`<title>`、登入頁副標。讀不到時 fallback 為 `"報銷系統"`。
+
+Tagline 裡的 `\n` 會換行——`.el-login-tagline` 有 `white-space:pre-line`。想改斷行位置就移動那個 `\n`，不要在設定檔裡放 `<br>`。
 
 ---
 
@@ -110,7 +138,26 @@ int AwaitingReviewCount   // Submitted
 
 **若暫時不想改 DTO**：view 檔內有註解，把那句換成原本的「員工墊款、個人預支與零用金支付的申請與追蹤」即可。
 
-### B3. `CashAdvanceListItemDto` 帶 `VoidedRelatedReportCount`
+### B3. 金額欄改成可空（可選，但建議）
+
+新增表單的金額欄目前用 view 端的判斷避免顯示 `0.00`：
+
+```csharp
+value="@(Model.Amount == 0m ? string.Empty : Model.Amount.ToString("0.##"))"
+```
+
+這是繞道。乾淨的做法是把新增用 ViewModel 的金額改成 `decimal?`，空值就自然是空欄位，順便讓「沒填」與「填 0」在驗證上分得開：
+
+```csharp
+[Display(Name = "預支金額")]
+[Required(ErrorMessage = "請填寫預支金額")]
+[Range(0.01, double.MaxValue, ErrorMessage = "金額必須大於 0")]
+public decimal? Amount { get; set; }
+```
+
+涉及 `CreateCashAdvanceForm.Amount`、新增明細與新增結清紀錄的 Amount。改完可以把上面那段 `value="..."` 拿掉。
+
+### B4. `CashAdvanceListItemDto` 帶 `VoidedRelatedReportCount`
 
 只有 B1 的首頁要顯示「作廢沒收拾」才需要。目前這個數字只在 `GetDetailsAsync` 算，把 `GetVoidedRelatedReportCountsAsync` 的結果也餵進 `MapListItem` 即可。
 

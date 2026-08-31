@@ -275,7 +275,8 @@
                         </div>
                         <div class="field">
                             <label asp-for="NewDetail.Amount">金額</label>
-                            <input asp-for="NewDetail.Amount" class="input" inputmode="decimal" />
+                            @* 新增時不要預填 0.00 *@
+                            <input asp-for="NewDetail.Amount" class="input" inputmode="decimal" value="@(Model.NewDetail.Amount == 0m ? string.Empty : Model.NewDetail.Amount.ToString("0.##"))" />
                             <span asp-validation-for="NewDetail.Amount" class="el-error"></span>
                         </div>
                         <div class="el-actions">

@@ -218,7 +218,8 @@
 
                     <div class="field">
                         <label asp-for="Settlement.Amount">結清金額</label>
-                        <input asp-for="Settlement.Amount" class="input" inputmode="decimal" />
+                        @* 新增時不要預填 0.00 *@
+                        <input asp-for="Settlement.Amount" class="input" inputmode="decimal" value="@(Model.Settlement.Amount == 0m ? string.Empty : Model.Settlement.Amount.ToString("0.##"))" />
                         <div class="el-hint">尚待結清 @advance.RemainingSettlementAmount.ToString("N2")，不可超過。</div>
                         <span asp-validation-for="Settlement.Amount" class="el-error"></span>
                     </div>

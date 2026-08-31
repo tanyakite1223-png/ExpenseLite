@@ -1,6 +1,6 @@
 @inject IConfiguration Config
 @{
-    var appName = Config["App:Name"] ?? "ExpenseLite";
+    var appName = Config["App:Name"] ?? "報銷系統";
 }
 <!DOCTYPE html>
 <html lang="zh-Hant">
@@ -28,9 +28,10 @@
     <main>
         @RenderBody()
     </main>
-    <footer class="footer border-top mt-4 py-3 text-center">
-        <span>© 2026 報銷系統</span>
-        <span class="mx-2">·</span>
+    @* 資料使用說明不是日常操作，不該佔功能列的位置——放頁尾，需要時找得到就好。
+       中間的分隔點由 .el-foot 的 gap 與 ::before 處理，不要在標記裡打「·」。 *@
+    <footer class="el-foot">
+        <span>© @DateTime.Now.Year @appName</span>
         <a asp-controller="Home" asp-action="Privacy">資料使用說明</a>
     </footer>
 </div>

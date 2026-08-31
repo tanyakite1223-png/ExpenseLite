@@ -8,7 +8,7 @@
     <a asp-action="Index">← 返回列表</a>
     <h1 class="el-title el-title--form">新增預支款</h1>
 
-    <form asp-action="Create" method="post" class="el-fields">
+    <form asp-action="Create" method="post" class="el-fields el-fields--inline">
         <div asp-validation-summary="ModelOnly" class="el-error"></div>
 
         <div class="field">
@@ -38,7 +38,8 @@
 
         <div class="field">
             <label asp-for="Amount">預支金額</label>
-            <input asp-for="Amount" class="input" inputmode="decimal" />
+            @* 新增時不要預填 0.00，使用者得先刪掉才能打字 *@
+            <input asp-for="Amount" class="input" inputmode="decimal" value="@(Model.Amount == 0m ? string.Empty : Model.Amount.ToString("0.##"))" />
             <span asp-validation-for="Amount" class="el-error"></span>
         </div>
 

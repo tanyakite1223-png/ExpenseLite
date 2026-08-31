@@ -25,7 +25,10 @@
 
         <div class="field">
             <label asp-for="Password">密碼</label>
-            <input asp-for="Password" class="input" type="password" autocomplete="current-password" />
+            @* 切換鈕由 el-password-toggle.js 自己補上，這裡只要包一層並標記。 *@
+            <span class="el-password">
+                <input asp-for="Password" class="input" type="password" autocomplete="current-password" data-el-password />
+            </span>
             <span asp-validation-for="Password" class="el-error"></span>
         </div>
 
@@ -43,4 +46,5 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/el-password-toggle.js" asp-append-version="true"></script>
 }

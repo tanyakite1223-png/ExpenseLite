@@ -23,7 +23,7 @@
     }
     else
     {
-        <form asp-action="Edit" asp-route-id="@Model.CashAdvance.Id" method="post" class="el-fields">
+        <form asp-action="Edit" asp-route-id="@Model.CashAdvance.Id" method="post" class="el-fields el-fields--inline">
             <div asp-validation-summary="ModelOnly" class="el-error"></div>
             <input asp-for="CashAdvanceForm.CashAdvanceId" type="hidden" />
 

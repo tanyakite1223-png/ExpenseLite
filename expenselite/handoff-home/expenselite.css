@@ -501,6 +501,16 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* 靠右的金額欄與下一欄之間多留一點距離，數字才不會黏著鄰欄的文字 */
 .el-table--advances th:nth-child(4),
 .el-table--advances td:nth-child(4){padding-right:var(--space-6)}
+/* 視窗窄於這個寬度就橫向捲動，不要把每一欄一起壓爛 */
+.el-table--reports{min-width:1080px}
+.el-table--advances,.el-table--users,.el-table--project-reports{min-width:980px}
+.el-table--projects{min-width:820px}
+.el-table--details,.el-table--slip{min-width:720px}
+/* 捲軸出現在內容區而不是整頁，功能列與頁尾不跟著跑 */
+.el-page{overflow-x:auto}
+/* 側欄裡的明細表跟著主欄寬度走，不另外撐出捲軸 */
+.el-split .el-table--details{min-width:0}
+
 /* 每列之間多一點呼吸，掃列時不容易看錯行 */
 .el-table td{padding-top:11px;padding-bottom:11px;vertical-align:top}
 .el-table td .tag{vertical-align:top}
@@ -630,17 +640,14 @@ textarea.input { min-height: 90px; resize: vertical; }
 .el-fields{display:flex;flex-direction:column;gap:var(--space-3)}
 /* 橫式表單：label 在左、控制項在右。說明與錯誤訊息跟著排在控制項下方，
    不要跑到 label 那一欄。 */
-.el-fields--inline .field{display:grid;grid-template-columns:112px 1fr;gap:5px var(--space-3)}
+/* 標籤欄寬全站統一 76px：最長標籤是「確認預設密碼」（6 字 @12px ≈ 72px）。
+   欄寬也跟 .el-facts 共用，唯讀資訊列表與表單上下才對得齊。 */
+.el-fields--inline .field{display:grid;grid-template-columns:76px 1fr;gap:5px var(--space-3)}
 .el-fields--inline .field > label{grid-column:1;grid-row:1;margin-bottom:0;padding-top:9px}
 .el-fields--inline .field > *:not(label){grid-column:2}
 .el-fields--inline > .el-actions,
 .el-fields--inline > .el-error,
-.el-fields--inline > .el-fixed-direction{padding-left:calc(112px + var(--space-3))}
-/* 短標籤的橫式表單：標籤欄收窄，label 與控制項靠近一點 */
-.el-fields--tight .field{grid-template-columns:76px 1fr}
-.el-fields--tight > .el-actions,
-.el-fields--tight > .el-error,
-.el-fields--tight > .el-fixed-direction{padding-left:calc(76px + var(--space-3))}
+.el-fields--inline > .el-fixed-direction{padding-left:calc(76px + var(--space-3))}
 .el-actions{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)}
 .el-actions--end{justify-content:flex-end;margin-top:var(--space-3)}
 .el-actions form{display:contents}
@@ -674,7 +681,7 @@ textarea.input.el-desc{min-height:66px}
 .el-login{min-height:100vh;display:grid;grid-template-columns:1fr 1fr}
 .el-login-brand{display:flex;flex-direction:column;justify-content:center;padding:0 calc(var(--space-8) * 1.75)}
 .el-login-wordmark{font-size:64px;margin:0;font-family:var(--font-heading);font-weight:var(--font-heading-weight);letter-spacing:-0.025em;line-height:1}
-.el-login-tagline{max-width:34ch;color:var(--color-neutral-800);margin-top:var(--space-4);line-height:1.7}
+.el-login-tagline{color:var(--color-neutral-800);margin-top:var(--space-4);line-height:1.7;white-space:pre-line}
 .el-login-panel{background:var(--color-surface);display:flex;flex-direction:column;justify-content:center;padding:0 calc(var(--space-8) * 1.75)}
 .el-login-panel .input{background:var(--color-bg)}
 /* 密碼強度：三格 */
@@ -761,13 +768,16 @@ textarea.input.el-desc{min-height:66px}
 /* — 唯讀資訊列表 — */
 /* 表單上方「這是哪一筆」的脈絡。原本用 table 切版，改成定義列表：
    標籤小字在左、值在右，靠留白與細線分隔，不畫框。 */
-.el-facts{display:grid;grid-template-columns:112px 1fr;gap:0 var(--space-3);max-width:520px;margin:var(--space-4) 0 var(--space-6)}
+.el-facts{display:grid;grid-template-columns:76px 1fr;gap:0 var(--space-3);max-width:520px;margin:var(--space-4) 0 var(--space-6)}
 .el-facts dt{font-size:12px;color:var(--color-neutral-700);padding:9px 0;white-space:nowrap}
 .el-facts dd{margin:0;padding:9px 0;font-size:15px}
 .el-facts dt,.el-facts dd{border-bottom:1px solid var(--color-divider)}
 /* 同一格裡並排的兩個值（方向與金額） */
 .el-facts .pair{display:inline-flex;gap:var(--space-3);align-items:baseline}
 .el-facts .num{font-variant-numeric:tabular-nums}
+/* 值是整句說明而非短欄位時，放寬到一般讀行長度 */
+.el-facts--prose{max-width:none;grid-template-columns:112px minmax(0,68ch)}
+.el-facts--prose dd{line-height:1.7}
 
 
 /* 表格內的次要說明（狀態底下那行「仍有流程中報銷單」） */
@@ -851,7 +861,8 @@ textarea.input.el-desc{min-height:66px}
   @page{margin:14mm}
   .el-nav,.el-rule,.no-print{display:none !important}
   body{background:#fff}
-  .el-page{padding:0}
+  .el-page{padding:0;overflow-x:visible}
+  .el-table{min-width:0 !important}
   /* 網頁的青色連結在黑白印表機上是淺灰，全部轉回墨色 */
   a{color:var(--color-text) !important;text-decoration:none}
   /* 換人就換頁：一疊發票對一張紙，不要跨在兩張紙上 */
@@ -864,6 +875,32 @@ textarea.input.el-desc{min-height:66px}
   /* 螢幕上的淺灰底在紙上印不出來，改用線 */
   .el-table thead{background:transparent;border-bottom:1px solid var(--color-text)}
 }
+
+/* — 頁尾 — */
+/* el-shell 是 flex column，margin-top:auto 把頁尾推到視窗底部，
+   內容短的頁面也不會讓它浮在中間。 */
+.el-foot{
+  margin-top:auto;padding:var(--space-6) var(--space-8) var(--space-6);
+  display:flex;align-items:baseline;gap:var(--space-3);
+  font-size:12px;color:var(--color-neutral-700);
+}
+/* 分隔點由樣式生成，標記裡不要出現「·」——之後增減連結不用改文字 */
+.el-foot > * + *::before{content:"·";margin-right:var(--space-3);color:var(--color-neutral-500)}
+
+/* — 密碼欄的明碼切換 — */
+/* 切換鈕壓在輸入框右緣內側。用文字而不是眼睛圖示：這套系統的介面語言就是襯線字，
+   而且「顯示／隱藏」比一顆劃掉的眼睛更沒有歧義（圖示常讓人分不清是現在的狀態還是按下去的結果）。 */
+.el-password{position:relative;display:block}
+.el-password > .input{padding-right:64px}
+.el-password-toggle{
+  position:absolute;right:1px;top:1px;bottom:1px;
+  display:flex;align-items:center;
+  padding:0 10px;border:0;background:transparent;
+  font:inherit;font-size:12px;color:var(--color-accent-700);
+  cursor:pointer;border-radius:0 var(--radius-md) var(--radius-md) 0;
+}
+.el-password-toggle:hover{background:var(--color-accent-100)}
+.el-password-toggle:focus-visible{outline:2px solid var(--color-accent);outline-offset:-2px}
 
 /* — 核取方塊（設計系統只有 radio 的圓點，方形沿用同一顆） — */
 .radio .dot.square{border-radius:var(--radius-md)}

@@ -67,12 +67,12 @@ Bootstrap 的 CSS 可以先留著（相容層寫在後面會覆蓋它），確�
 
 ```json
 "App": {
-  "Name": "ExpenseLite",
+  "Name": "報銷系統",
   "Tagline": "員工墊款、個人預支與零用金支付的申請、審核與核對。帳號由主管建立。"
 }
 ```
 
-兩支 Layout 用 `@inject IConfiguration Config` 讀它，涵蓋功能列字標、登入頁字標、`<title>`、登入頁副標。改名字只要動這一處，而且仍然是真正的文字（可搜尋、可複製、螢幕閱讀器讀得到）。讀不到時 fallback 是 `"ExpenseLite"`，不會空白。
+兩支 Layout 用 `@inject IConfiguration Config` 讀它，涵蓋功能列字標、登入頁字標、`<title>`、登入頁副標。改名字只要動這一處，而且仍然是真正的文字（可搜尋、可複製、螢幕閱讀器讀得到）。讀不到時 fallback 是 `"報銷系統"`，不會空白。
 
 ## 已改好的 Razor view
 
@@ -109,6 +109,7 @@ Bootstrap 的 CSS 可以先留著（相容層寫在後面會覆蓋它），確�
 | `Users/Create.cshtml` | — |
 | `Users/ResetPassword.cshtml` | — |
 | `wwwroot-js/el-password-strength.js` | 放到 `wwwroot/js/`，純顯示，規則仍由 Identity 驗 |
+| `wwwroot-js/el-password-toggle.js` | 放到 `wwwroot/js/`，登入頁密碼欄的明碼切換；切換鈕由腳本注入，view 只需 `<span class="el-password">` 包裹 ＋ `data-el-password` |
 
 各檔的 `@functions` 只列出新增的 mapper，其餘文字轉換函式沿用原檔，檔內有註解標明哪些可以刪。
 
