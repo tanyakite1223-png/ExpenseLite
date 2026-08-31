@@ -1,31 +1,165 @@
+/* ── 色系 ────────────────────────────────────── */
+:root {
+  --med-primary:       #AEDDEF;   /* 淺粉藍主色 */
+  --med-primary-hover: #8BCFE8;   /* hover 深一階 */
+  --med-primary-rgb:   174, 221, 239;
+  --med-primary-text:  #2C3E50;   /* 疊在主色上的文字（深色） */
+  --med-bg:            #F6FBFD;   /* 極淡藍白底色 */
+  --med-border:        #C5DDE8;   /* 邊框 / 分隔線 */
+  --med-accent:        #B5651D;   /* 強調色（小面積赭土） */
+  --med-text:          #2C3E50;   /* 頁面主文字 */
+  --med-muted:         #7F8C8D;   /* 次要文字 */
+}
+
+/* ── 基礎 ────────────────────────────────────── */
 html {
   font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
   position: relative;
   min-height: 100%;
 }
 
+@media (min-width: 768px) {
+  html { font-size: 16px; }
+}
+
 body {
   margin-bottom: 60px;
+  background-color: var(--med-bg);
+  color: var(--med-text);
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+a {
+  color: #3A86A8;
+}
+a:hover {
+  color: #2A6A88;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+/* ── Navbar ──────────────────────────────────── */
+.navbar {
+  background-color: var(--med-primary) !important;
+  border-bottom: 1px solid var(--med-border) !important;
+}
+
+.navbar-brand,
+.navbar-brand:hover {
+  color: var(--med-primary-text);
+  font-weight: 600;
+}
+
+.navbar .nav-link {
+  color: rgba(44, 62, 80, 0.75) !important;
+}
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: var(--med-primary-text) !important;
+}
+
+/* ── 按鈕 ────────────────────────────────────── */
+.btn-primary {
+  --bs-btn-bg:                 var(--med-primary);
+  --bs-btn-color:              var(--med-primary-text);
+  --bs-btn-border-color:       var(--med-border);
+  --bs-btn-hover-bg:           var(--med-primary-hover);
+  --bs-btn-hover-color:        var(--med-primary-text);
+  --bs-btn-hover-border-color: var(--med-primary-hover);
+  --bs-btn-active-bg:          var(--med-primary-hover);
+  --bs-btn-active-color:       var(--med-primary-text);
+  --bs-btn-active-border-color: var(--med-primary-hover);
+}
+
+.btn-outline-primary {
+  --bs-btn-color:              #3A86A8;
+  --bs-btn-border-color:       #3A86A8;
+  --bs-btn-hover-bg:           var(--med-primary);
+  --bs-btn-hover-color:        var(--med-primary-text);
+  --bs-btn-hover-border-color: var(--med-primary);
+  --bs-btn-active-bg:          var(--med-primary);
+  --bs-btn-active-color:       var(--med-primary-text);
+  --bs-btn-active-border-color: var(--med-primary);
+}
+
+.btn:focus, .btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem rgba(var(--med-primary-rgb), 0.45);
+}
+
+/* ── 表單 ────────────────────────────────────── */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--med-primary-hover);
+}
+
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
+  color: transparent;
+}
+
+.form-floating > label {
+  color: var(--med-muted);
+}
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+  color: var(--med-primary-text);
+  opacity: 0.75;
+}
+
+/* ── 表格 ────────────────────────────────────── */
+.table thead th {
+  background-color: var(--med-primary);
+  color: var(--med-primary-text);
+  border-color: var(--med-border);
+}
+
+/* ── Card ────────────────────────────────────── */
+.card {
+  border-color: var(--med-border);
+}
+.card-header {
+  background-color: var(--med-primary);
+  color: var(--med-primary-text);
+  border-bottom-color: var(--med-border);
+}
+
+/* ── Footer ──────────────────────────────────── */
+.footer {
+  color: var(--med-muted);
+  border-top-color: var(--med-border) !important;
+}
+
+/* ── 登入頁專用 ──────────────────────────────── */
+.login-bg {
+  background: linear-gradient(150deg, #E8F4FB 0%, #F6FBFD 55%, #FAF8F5 100%);
+  margin-bottom: 0; /* 覆蓋 body 的 margin-bottom: 60px */
+}
+
+.login-center-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 3rem 1rem;
+}
+
+.login-brand {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--med-text);
+  letter-spacing: 0.01em;
+}
+
+.login-brand-sub {
+  font-size: 0.85rem;
+  color: var(--med-muted);
+  margin-top: 2px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  border-top: 4px solid var(--med-primary);
+  border-radius: 0.5rem;
 }
