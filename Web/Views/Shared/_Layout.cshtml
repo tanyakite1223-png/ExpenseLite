@@ -28,6 +28,11 @@
     <main>
         @RenderBody()
     </main>
+    <footer class="footer border-top mt-4 py-3 text-center">
+        <span>© 2026 報銷系統</span>
+        <span class="mx-2">·</span>
+        <a asp-controller="Home" asp-action="Privacy">資料使用說明</a>
+    </footer>
 </div>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

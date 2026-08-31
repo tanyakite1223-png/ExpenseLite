@@ -3,8 +3,8 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
 
-> 最後更新：2026-08-17 — **筆記體系優化**:Diátaxis 收乾實驗第一輪(3 主題 / 13 處,75,513→72,866 bytes / -3.5%),**尚未完成**,詳見 [notes-Diataxis實驗.md](notes-Diataxis實驗.md)。
-> 前次:2026-08-16 完成四件功能(首次登入強制改密碼、只剩一位日常主管紅色 alert、主管不能對自己動、列印報表),細節見〈已完成功能〉與各對應 architecture 檔。
+> 最後更新：2026-08-31 — UI 小修（已結清預支款隱藏修改按鈕、重設密碼頁補帳號說明、Layout 加 footer）。
+> 前次：2026-08-30 套用 expenselite 設計系統（畫面改版），新增首頁待辦 HomeAppService，修正靜態檔案驗證問題。
 
 ---
 
@@ -512,11 +512,11 @@ DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留�
 - ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）—— 詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
 - ✅ **主管不能停用 / 降級自己**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
 - ✅ **列印報表**（2026-08-16）：`/ExpenseReports/Print?from=&to=` 一頁兩用——員工整理已核准報銷單交出納對照、主管看月度全公司支出。頂部 4 分組總表（員工版隱藏「按申請人」）+ 底部依申請人分卡。`@media print` CSS + `window.print()`，零 NuGet 套件。詳見〈已完成功能 / 列印報表〉與 `docs/architecture/list-filtering-queries.md` 的〈列印報表：同一種思路的另一個例子〉。
+- ✅ **畫面改版（2026-08-30）**：套用 expenselite 設計系統。25 支 Razor view 全數換新版式（淡青底功能列、留白分隔、狀態色系統一）；`expenselite.css` 取代 Bootstrap 預設樣式為主要視覺（Bootstrap CSS 暫留，JS 保留）。首頁實作「等你處理的事」待辦清單（`HomeAppService` / `HomePageDto` / `HomeTodoDto`）：主管看待審報銷單 / 預支款待結清 / 作廢未收拾，員工看退回單 / 草稿 / 預支款剩餘。補 `UnfinishedCount`、`AwaitingReviewCount`（`ExpenseReportListPageDto`）與 `VoidedRelatedReportCount`（`CashAdvanceListItemDto`）。`MapStaticAssets().AllowAnonymous()` 修正 fallback policy 攔截靜態檔案的問題。源素材保留在 `expenselite/`（`.csproj` 已排除 Razor 編譯）。
 
 ### 應用面候補（尚未排序）
 
-- **UI / 美編整體檢視**：目前 Bootstrap 預設樣式，色塊感偏淡（例如 `alert-warning` Amber 手動驗證時反映「沒有色塊」——實際 markup 正確、只是預設淡黃底不夠鮮明）。Amber 決定等專案功能全部完成後**整批重新設計美編**，本項作為統一入口。**新增功能時繼續用 Bootstrap 標準 class，別為單一頁面自訂顏色。**
-- **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定，可等美編重整時一併感受。
+- **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定。
 - **附件 / 發票照片上傳** — **2026-08-16 Amber 決定不做**（記著避免下次又提議）。理由：涉及檔案儲存 / 大小限制 / 安全性，本階段範圍取捨掉。
 - 若未來真的要做沖銷、付款憑證或出納日記帳，需另開會計帳範圍設計，**不建議混進第一階段**。
 

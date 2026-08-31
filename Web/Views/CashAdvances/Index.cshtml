@@ -111,7 +111,7 @@
                     <td>
                         <div class="el-cell-actions">
                             <a class="btn btn-ghost" asp-action="Details" asp-route-id="@cashAdvance.Id">@ActionText(cashAdvance, isManager)</a>
-                            @if (isManager)
+                            @if (isManager && !cashAdvance.IsSettled)
                             {
                                 <a class="btn btn-ghost" asp-action="Edit" asp-route-id="@cashAdvance.Id">修改</a>
                             }
