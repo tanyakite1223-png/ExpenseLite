@@ -14,15 +14,18 @@ public sealed class ExpenseReportAppService
     private readonly IExpenseReportRepository _reports;
     private readonly ICashAdvanceRepository _cashAdvances;
     private readonly IProjectRepository _projects;
+    private readonly IAttachmentStorageService _attachmentStorage;
 
     public ExpenseReportAppService(
         IExpenseReportRepository reports,
         ICashAdvanceRepository cashAdvances,
-        IProjectRepository projects)
+        IProjectRepository projects,
+        IAttachmentStorageService attachmentStorage)
     {
         _reports = reports;
         _cashAdvances = cashAdvances;
         _projects = projects;
+        _attachmentStorage = attachmentStorage;
     }
 
     public async Task<ExpenseReportListPageDto> ListPageAsync(
@@ -270,7 +273,7 @@ public sealed class ExpenseReportAppService
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
         EnsureCanBeEditedBy(report, command.Editor);
 
-        report.AddDetail(
+        var detail = report.AddDetail(
             command.ExpenseDate,
             command.Category,
             command.Description,
@@ -278,7 +281,28 @@ public sealed class ExpenseReportAppService
             command.InvoiceNumber,
             Money.From(command.Amount));
 
-        await _reports.SaveChangesAsync(cancellationToken);
+        string? savedPath = null;
+        try
+        {
+            if (command.Attachment is not null)
+            {
+                savedPath = await _attachmentStorage.SaveAsync(
+                    command.Attachment.Stream,
+                    command.Attachment.Extension,
+                    cancellationToken);
+                report.SetDetailAttachment(detail.Id, command.Attachment.OriginalFileName, savedPath, DateTimeOffset.UtcNow);
+            }
+
+            await _reports.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            if (savedPath is not null)
+            {
+                await _attachmentStorage.DeleteAsync(savedPath, cancellationToken);
+            }
+            throw;
+        }
     }
 
     public async Task RemoveDetailAsync(RemoveExpenseDetailCommand command, CancellationToken cancellationToken = default)
@@ -286,15 +310,27 @@ public sealed class ExpenseReportAppService
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
         EnsureCanBeEditedBy(report, command.Editor);
 
-        report.RemoveDetail(command.DetailId);
+        var storedPath = report.Details
+            .SingleOrDefault(d => d.Id == command.DetailId)
+            ?.AttachmentStoredPath;
 
+        report.RemoveDetail(command.DetailId);
         await _reports.SaveChangesAsync(cancellationToken);
+
+        if (storedPath is not null)
+        {
+            await _attachmentStorage.DeleteAsync(storedPath, cancellationToken);
+        }
     }
 
     public async Task UpdateDetailAsync(UpdateExpenseDetailCommand command, CancellationToken cancellationToken = default)
     {
         var report = await GetRequiredReportAsync(command.ReportId, cancellationToken);
         EnsureCanBeEditedBy(report, command.Editor);
+
+        var oldStoredPath = report.Details
+            .SingleOrDefault(d => d.Id == command.DetailId)
+            ?.AttachmentStoredPath;
 
         report.UpdateDetail(
             command.DetailId,
@@ -305,7 +341,41 @@ public sealed class ExpenseReportAppService
             command.InvoiceNumber,
             Money.From(command.Amount));
 
-        await _reports.SaveChangesAsync(cancellationToken);
+        string? newStoredPath = null;
+        try
+        {
+            if (command.NewAttachment is not null)
+            {
+                newStoredPath = await _attachmentStorage.SaveAsync(
+                    command.NewAttachment.Stream,
+                    command.NewAttachment.Extension,
+                    cancellationToken);
+                report.SetDetailAttachment(command.DetailId, command.NewAttachment.OriginalFileName, newStoredPath, DateTimeOffset.UtcNow);
+            }
+            else if (command.RemoveAttachment)
+            {
+                report.ClearDetailAttachment(command.DetailId);
+            }
+
+            await _reports.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            if (newStoredPath is not null)
+            {
+                await _attachmentStorage.DeleteAsync(newStoredPath, cancellationToken);
+            }
+            throw;
+        }
+
+        // DB 已成功儲存，才刪舊檔（刪檔失敗只是磁碟殘留，DB 已乾淨，可接受）。
+        if (newStoredPath is not null || command.RemoveAttachment)
+        {
+            if (oldStoredPath is not null)
+            {
+                await _attachmentStorage.DeleteAsync(oldStoredPath, cancellationToken);
+            }
+        }
     }
 
     public async Task SubmitAsync(SubmitExpenseReportCommand command, CancellationToken cancellationToken = default)
@@ -373,8 +443,18 @@ public sealed class ExpenseReportAppService
             throw new DomainRuleViolationException("只有草稿可以刪除。已進入審核流程的報銷單請改用取消或作廢。");
         }
 
+        var attachmentPaths = report.Details
+            .Where(d => d.AttachmentStoredPath is not null)
+            .Select(d => d.AttachmentStoredPath!)
+            .ToList();
+
         await _reports.DeleteAsync(report, cancellationToken);
         await _reports.SaveChangesAsync(cancellationToken);
+
+        foreach (var path in attachmentPaths)
+        {
+            await _attachmentStorage.DeleteAsync(path, cancellationToken);
+        }
     }
 
     /// <summary>申請人取消退回單（軟刪）。可再由 <see cref="RestoreAsync"/> 復活。</summary>
@@ -649,7 +729,10 @@ public sealed class ExpenseReportAppService
                     x.Description,
                     x.ReceiptType,
                     x.InvoiceNumber,
-                    x.Amount.Amount))
+                    x.Amount.Amount,
+                    x.AttachmentFileName,
+                    x.AttachmentStoredPath,
+                    x.AttachmentUploadedAt))
                 .ToList(),
             report.ReviewRecords
                 .OrderByDescending(x => x.ReviewedAt)

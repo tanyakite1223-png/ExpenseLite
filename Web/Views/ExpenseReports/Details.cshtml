@@ -137,6 +137,7 @@
                             <th>說明</th>
                             <th>單據</th>
                             <th>發票號碼</th>
+                            <th>附件</th>
                             <th>金額</th>
                             @if (canEdit) { <th></th> }
                         </tr>
@@ -150,6 +151,12 @@
                             <td>@detail.Description</td>
                             <td>@ReceiptTypeText(detail.ReceiptType)</td>
                             <td>@DisplayInvoiceNumber(detail)</td>
+                            <td>
+                                @if (detail.AttachmentStoredPath is not null)
+                                {
+                                    <a href="@Url.Action("Attachment", new { id = Model.Report.Id, detailId = detail.Id })" target="_blank" class="el-hint">@detail.AttachmentFileName</a>
+                                }
+                            </td>
                             <td class="num">@detail.Amount.ToString("N2")</td>
                             @if (canEdit)
                             {
@@ -199,7 +206,7 @@
                 @if (Model.EditDetail is not null)
                 {
                     <div class="el-rail-label">修改明細</div>
-                    <form asp-action="UpdateDetail" asp-route-id="@Model.Report.Id" asp-route-detailId="@Model.EditDetail.Id" method="post" class="el-fields">
+                    <form asp-action="UpdateDetail" asp-route-id="@Model.Report.Id" asp-route-detailId="@Model.EditDetail.Id" method="post" enctype="multipart/form-data" class="el-fields">
                         <div asp-validation-summary="ModelOnly" class="el-error"></div>
                         <div class="field">
                             <label asp-for="EditDetail.ExpenseDate">日期</label>
@@ -249,6 +256,34 @@
                             <input asp-for="EditDetail.Amount" name="Amount" class="input" inputmode="decimal" />
                             <span asp-validation-for="EditDetail.Amount" class="el-error"></span>
                         </div>
+                        <div class="field">
+                            <label>附件</label>
+                            @if (Model.EditDetail!.ExistingAttachmentStoredPath is not null)
+                            {
+                                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                                    <a href="@Url.Action("Attachment", new { id = Model.Report.Id, detailId = Model.EditDetail.Id })" target="_blank" class="el-hint">@Model.EditDetail.ExistingAttachmentFileName</a>
+                                    <input type="hidden" name="RemoveAttachment" id="removeAttachmentInput" value="false" />
+                                    <button type="button" class="btn btn-ghost btn-remove"
+                                        onclick="if(confirm('確定要刪除這個附件嗎？')) { document.getElementById('removeAttachmentInput').value='true'; this.closest('form').submit(); }">
+                                        刪除附件
+                                    </button>
+                                </div>
+                                <input type="file" name="NewAttachment" id="newAttachmentInput" accept=".pdf" style="display:none"
+                                    onchange="document.getElementById('newAttachmentLabel').textContent = this.files[0]?.name ?? '';" />
+                                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                        onclick="if(confirm('確定要更換現有附件嗎？')) { document.getElementById('newAttachmentInput').click(); }">
+                                        更換附件
+                                    </button>
+                                    <span id="newAttachmentLabel" class="el-hint"></span>
+                                </div>
+                            }
+                            else
+                            {
+                                <input type="file" name="NewAttachment" class="input" accept=".pdf" />
+                                <div class="el-hint">選填，僅支援 PDF。</div>
+                            }
+                        </div>
                         <div class="el-actions">
                             <button type="submit" class="btn btn-primary">儲存明細</button>
                             <a class="btn btn-secondary" asp-action="Details" asp-route-id="@Model.Report.Id">取消</a>
@@ -258,7 +293,7 @@
                 else
                 {
                     <div class="el-rail-label">新增明細</div>
-                    <form asp-action="AddDetail" asp-route-id="@Model.Report.Id" method="post" class="el-fields">
+                    <form asp-action="AddDetail" asp-route-id="@Model.Report.Id" method="post" enctype="multipart/form-data" class="el-fields">
                         <div asp-validation-summary="ModelOnly" class="el-error"></div>
                         <div class="field">
                             <label asp-for="NewDetail.ExpenseDate">日期</label>
@@ -303,6 +338,11 @@
                             @* 新增時不要預填 0.00 *@
                             <input asp-for="NewDetail.Amount" class="input" inputmode="decimal" value="@(Model.NewDetail.Amount == 0m ? string.Empty : Model.NewDetail.Amount.ToString("0.##"))" />
                             <span asp-validation-for="NewDetail.Amount" class="el-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="NewDetail.Attachment">附件（選填）</label>
+                            <input asp-for="NewDetail.Attachment" type="file" class="input" accept=".pdf" />
+                            <div class="el-hint">僅支援 PDF。</div>
                         </div>
                         <div class="el-actions">
                             <button type="submit" class="btn btn-primary">加入明細</button>

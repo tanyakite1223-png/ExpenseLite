@@ -118,6 +118,17 @@ public sealed class ExpenseReportConfiguration : IEntityTypeConfiguration<Expens
                     .HasColumnType("numeric(18,2)")
                 .IsRequired();
             });
+
+            detail.Property(x => x.AttachmentFileName)
+                .HasColumnName("attachment_file_name")
+                .HasMaxLength(255);
+
+            detail.Property(x => x.AttachmentStoredPath)
+                .HasColumnName("attachment_stored_path")
+                .HasMaxLength(500);
+
+            detail.Property(x => x.AttachmentUploadedAt)
+                .HasColumnName("attachment_uploaded_at");
         });
 
         builder.OwnsMany(x => x.ReviewRecords, review =>

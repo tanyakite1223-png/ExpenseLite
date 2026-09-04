@@ -65,6 +65,12 @@ public sealed class ExpenseDetail
 
     public Money Amount { get; private set; }
 
+    public string? AttachmentFileName { get; private set; }
+
+    public string? AttachmentStoredPath { get; private set; }
+
+    public DateTimeOffset? AttachmentUploadedAt { get; private set; }
+
     internal void Update(
         DateOnly expenseDate,
         string category,
@@ -81,6 +87,20 @@ public sealed class ExpenseDetail
         ReceiptType = receiptType;
         InvoiceNumber = invoiceNumber?.Trim() ?? string.Empty;
         Amount = amount;
+    }
+
+    internal void SetAttachment(string fileName, string storedPath, DateTimeOffset uploadedAt)
+    {
+        AttachmentFileName = fileName.Trim();
+        AttachmentStoredPath = storedPath;
+        AttachmentUploadedAt = uploadedAt;
+    }
+
+    internal void ClearAttachment()
+    {
+        AttachmentFileName = null;
+        AttachmentStoredPath = null;
+        AttachmentUploadedAt = null;
     }
 
     private static void EnsureDetailIsValid(

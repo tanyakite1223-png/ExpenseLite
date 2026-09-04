@@ -3,6 +3,7 @@ using ExpenseLite.Application.ExpenseCategories;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Shared;
 using ExpenseLite.Web.ViewModels.ExpenseReports;
@@ -17,17 +18,20 @@ public sealed class ExpenseReportsController : Controller
     private readonly CashAdvanceAppService _cashAdvances;
     private readonly ProjectAppService _projects;
     private readonly ExpenseCategoryAppService _categories;
+    private readonly IAttachmentStorageService _attachmentStorage;
 
     public ExpenseReportsController(
         ExpenseReportAppService expenseReports,
         CashAdvanceAppService cashAdvances,
         ProjectAppService projects,
-        ExpenseCategoryAppService categories)
+        ExpenseCategoryAppService categories,
+        IAttachmentStorageService attachmentStorage)
     {
         _expenseReports = expenseReports;
         _cashAdvances = cashAdvances;
         _projects = projects;
         _categories = categories;
+        _attachmentStorage = attachmentStorage;
     }
 
     public async Task<IActionResult> Index(
@@ -217,6 +221,12 @@ public sealed class ExpenseReportsController : Controller
 
         try
         {
+            AttachmentData? attachment = null;
+            if (newDetail.Attachment is { Length: > 0 })
+            {
+                attachment = new AttachmentData(newDetail.Attachment.OpenReadStream(), newDetail.Attachment.FileName);
+            }
+
             await _expenseReports.AddDetailAsync(
                 new AddExpenseDetailCommand(
                     id,
@@ -226,7 +236,8 @@ public sealed class ExpenseReportsController : Controller
                     newDetail.Description,
                     newDetail.ReceiptType,
                     newDetail.InvoiceNumber,
-                    newDetail.Amount),
+                    newDetail.Amount,
+                    attachment),
                 cancellationToken);
 
             return RedirectToAction(nameof(Details), new { id });
@@ -266,6 +277,12 @@ public sealed class ExpenseReportsController : Controller
 
         try
         {
+            AttachmentData? newAttachment = null;
+            if (form.NewAttachment is { Length: > 0 })
+            {
+                newAttachment = new AttachmentData(form.NewAttachment.OpenReadStream(), form.NewAttachment.FileName);
+            }
+
             await _expenseReports.UpdateDetailAsync(
                 new UpdateExpenseDetailCommand(
                     id,
@@ -276,7 +293,9 @@ public sealed class ExpenseReportsController : Controller
                     form.Description,
                     form.ReceiptType,
                     form.InvoiceNumber,
-                    form.Amount),
+                    form.Amount,
+                    newAttachment,
+                    form.RemoveAttachment),
                 cancellationToken);
 
             TempData["SuccessMessage"] = "明細已更新。";
@@ -305,6 +324,33 @@ public sealed class ExpenseReportsController : Controller
         }
 
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>
+    /// 下載明細附件。先驗報銷單可見度，再開檔案。
+    /// 不走 wwwroot 直連，是為了讓授權保護蓋住每一次下載。
+    /// </summary>
+    public async Task<IActionResult> Attachment(Guid id, Guid detailId, CancellationToken cancellationToken)
+    {
+        var report = await _expenseReports.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
+        if (report is null)
+        {
+            return NotFound();
+        }
+
+        var detail = report.Details.SingleOrDefault(d => d.Id == detailId);
+        if (detail?.AttachmentStoredPath is null)
+        {
+            return NotFound();
+        }
+
+        var stream = await _attachmentStorage.OpenReadAsync(detail.AttachmentStoredPath, cancellationToken);
+        if (stream is null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "application/octet-stream", detail.AttachmentFileName ?? "attachment");
     }
 
     [HttpPost]
@@ -538,7 +584,9 @@ public sealed class ExpenseReportsController : Controller
             Description = detail.Description,
             ReceiptType = detail.ReceiptType,
             InvoiceNumber = detail.InvoiceNumber,
-            Amount = detail.Amount
+            Amount = detail.Amount,
+            ExistingAttachmentFileName = detail.AttachmentFileName,
+            ExistingAttachmentStoredPath = detail.AttachmentStoredPath
         };
     }
 

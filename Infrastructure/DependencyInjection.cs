@@ -3,6 +3,8 @@ using ExpenseLite.Application.ExpenseCategories;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
+using ExpenseLite.Application.Shared;
+using ExpenseLite.Infrastructure.Attachments;
 using ExpenseLite.Infrastructure.CashAdvances;
 using ExpenseLite.Infrastructure.ExpenseCategories;
 using ExpenseLite.Infrastructure.ExpenseReports;
@@ -56,6 +58,8 @@ public static class DependencyInjection
         services.AddScoped<IExpenseCategoryRepository, EfExpenseCategoryRepository>();
         services.AddScoped<IUserDirectory, IdentityUserDirectory>();
         services.AddScoped<IUserAccountStore, IdentityUserAccountStore>();
+        services.Configure<AttachmentOptions>(configuration.GetSection(AttachmentOptions.SectionName));
+        services.AddScoped<IAttachmentStorageService, FileSystemAttachmentStorageService>();
 
         return services;
     }

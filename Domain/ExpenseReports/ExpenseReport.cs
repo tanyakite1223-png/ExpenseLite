@@ -151,6 +151,26 @@ public sealed class ExpenseReport
         RecalculateTotal();
     }
 
+    public void SetDetailAttachment(Guid detailId, string fileName, string storedPath, DateTimeOffset uploadedAt)
+    {
+        EnsureEditable("只有草稿或退回的報銷單可以修改明細附件。");
+
+        var detail = _details.SingleOrDefault(x => x.Id == detailId)
+            ?? throw new DomainRuleViolationException("找不到要設定附件的明細。");
+
+        detail.SetAttachment(fileName, storedPath, uploadedAt);
+    }
+
+    public void ClearDetailAttachment(Guid detailId)
+    {
+        EnsureEditable("只有草稿或退回的報銷單可以修改明細附件。");
+
+        var detail = _details.SingleOrDefault(x => x.Id == detailId)
+            ?? throw new DomainRuleViolationException("找不到要清除附件的明細。");
+
+        detail.ClearAttachment();
+    }
+
     /// <summary>申請人是建立報銷單的登入者，建立後就不再變動，所以不在修改範圍內。</summary>
     public void UpdateBasicInfo(
         string title,

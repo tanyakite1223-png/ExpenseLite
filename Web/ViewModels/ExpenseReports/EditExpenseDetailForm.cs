@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using ExpenseLite.Domain.ExpenseReports;
+using Microsoft.AspNetCore.Http;
 
 namespace ExpenseLite.Web.ViewModels.ExpenseReports;
 
@@ -25,4 +26,14 @@ public sealed class EditExpenseDetailForm
 
     [Range(typeof(decimal), "0.01", "999999999999.99", ErrorMessage = "金額必須大於 0")]
     public decimal Amount { get; set; }
+
+    public IFormFile? NewAttachment { get; set; }
+
+    public bool RemoveAttachment { get; set; }
+
+    /// <summary>現有附件的原始檔名，顯示用。從 DTO 帶進來，不從表單接收。</summary>
+    public string? ExistingAttachmentFileName { get; set; }
+
+    /// <summary>現有附件的相對路徑，供下載連結使用。從 DTO 帶進來，不從表單接收。</summary>
+    public string? ExistingAttachmentStoredPath { get; set; }
 }

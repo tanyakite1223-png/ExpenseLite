@@ -82,7 +82,10 @@ public sealed record ExpenseDetailDto(
     string Description,
     ExpenseReceiptType ReceiptType,
     string InvoiceNumber,
-    decimal Amount);
+    decimal Amount,
+    string? AttachmentFileName,
+    string? AttachmentStoredPath,
+    DateTimeOffset? AttachmentUploadedAt);
 
 public sealed record ExpenseReviewRecordDto(
     Guid Id,

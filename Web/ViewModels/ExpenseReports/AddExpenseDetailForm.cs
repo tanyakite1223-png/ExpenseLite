@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using ExpenseLite.Domain.ExpenseReports;
+using Microsoft.AspNetCore.Http;
 
 namespace ExpenseLite.Web.ViewModels.ExpenseReports;
 
@@ -23,4 +24,6 @@ public sealed class AddExpenseDetailForm
 
     [Range(typeof(decimal), "0.01", "999999999999.99", ErrorMessage = "金額必須大於 0")]
     public decimal Amount { get; set; }
+
+    public IFormFile? Attachment { get; set; }
 }

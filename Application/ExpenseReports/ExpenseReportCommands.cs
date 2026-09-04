@@ -1,4 +1,5 @@
 using ExpenseLite.Application.Identity;
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.ExpenseReports;
 
 namespace ExpenseLite.Application.ExpenseReports;
@@ -28,7 +29,8 @@ public sealed record AddExpenseDetailCommand(
     string Description,
     ExpenseReceiptType ReceiptType,
     string? InvoiceNumber,
-    decimal Amount);
+    decimal Amount,
+    AttachmentData? Attachment);
 
 public sealed record UpdateExpenseDetailCommand(
     Guid ReportId,
@@ -39,7 +41,11 @@ public sealed record UpdateExpenseDetailCommand(
     string Description,
     ExpenseReceiptType ReceiptType,
     string? InvoiceNumber,
-    decimal Amount);
+    decimal Amount,
+    /// <summary>不為 null 時上傳新附件（同時取代舊附件）。</summary>
+    AttachmentData? NewAttachment,
+    /// <summary>true 且 NewAttachment 為 null 時刪除現有附件。</summary>
+    bool RemoveAttachment);
 
 public sealed record RemoveExpenseDetailCommand(
     Guid ReportId,
