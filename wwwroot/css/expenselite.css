@@ -824,7 +824,7 @@ textarea.input.el-desc{min-height:66px}
 .el-print-total-figure{font-size:15px}
 
 /* 彙總：四組分類並排，各自一疊「標籤 — 張數 — 金額」 */
-.el-sums{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-6) calc(var(--space-8) * 1.2);margin-top:var(--space-4)}
+.el-sums{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-6) calc(var(--space-8) * 1.2);margin-top:var(--space-4)}
 .el-sum-title{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-neutral-700);font-family:var(--font-heading);margin-bottom:var(--space-2)}
 .el-sum-row{display:grid;grid-template-columns:1fr auto auto;gap:var(--space-3);align-items:baseline;padding:5px 0;font-size:14px;border-bottom:1px solid var(--color-divider)}
 .el-sum-row:last-child{border-bottom:0}
@@ -875,6 +875,9 @@ textarea.input.el-desc{min-height:66px}
   /* 螢幕上的淺灰底在紙上印不出來，改用線 */
   .el-table thead{background:transparent;border-bottom:1px solid var(--color-text)}
 }
+
+/* — 重設密碼帳號顯示 — */
+.el-reset-target{margin-top:var(--space-4);font-size:15px;margin-bottom:0}
 
 /* — 頁尾 — */
 /* el-shell 是 flex column，margin-top:auto 把頁尾推到視窗底部，
