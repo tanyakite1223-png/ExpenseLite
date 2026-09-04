@@ -20,6 +20,7 @@
         <a asp-controller="Projects" asp-action="Index" aria-current="@Current("Projects")">專案</a>
         @if (User.IsManager())
         {
+            <a asp-controller="ExpenseCategories" asp-action="Index" aria-current="@Current("ExpenseCategories")">類別</a>
             <a asp-controller="Users" asp-action="Index" aria-current="@Current("Users")">使用者</a>
         }
         <partial name="_LoginPartial" />

@@ -13,4 +13,6 @@ public sealed class ExpenseReportDetailsPage
     public ReviewExpenseReportForm Review { get; init; } = new();
 
     public VoidExpenseReportForm Void { get; init; } = new();
+
+    public IReadOnlyList<string> AvailableCategories { get; init; } = [];
 }

@@ -10,8 +10,7 @@ public sealed class EditExpenseDetailForm
     [Required(ErrorMessage = "請選擇日期")]
     public DateOnly ExpenseDate { get; set; }
 
-    [Required(ErrorMessage = "請輸入類別")]
-    [StringLength(50, ErrorMessage = "類別最多 50 個字")]
+    [Required(ErrorMessage = "請選擇類別")]
     public string Category { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "請輸入說明")]

@@ -1,4 +1,5 @@
 using ExpenseLite.Application.CashAdvances;
+using ExpenseLite.Application.ExpenseCategories;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
@@ -15,15 +16,18 @@ public sealed class ExpenseReportsController : Controller
     private readonly ExpenseReportAppService _expenseReports;
     private readonly CashAdvanceAppService _cashAdvances;
     private readonly ProjectAppService _projects;
+    private readonly ExpenseCategoryAppService _categories;
 
     public ExpenseReportsController(
         ExpenseReportAppService expenseReports,
         CashAdvanceAppService cashAdvances,
-        ProjectAppService projects)
+        ProjectAppService projects,
+        ExpenseCategoryAppService categories)
     {
         _expenseReports = expenseReports;
         _cashAdvances = cashAdvances;
         _projects = projects;
+        _categories = categories;
     }
 
     public async Task<IActionResult> Index(
@@ -118,7 +122,8 @@ public sealed class ExpenseReportsController : Controller
         return View(new ExpenseReportDetailsPage
         {
             Report = report,
-            EditDetail = editDetail
+            EditDetail = editDetail,
+            AvailableCategories = await _categories.ListActiveNamesAsync(cancellationToken)
         });
     }
 
@@ -205,7 +210,8 @@ public sealed class ExpenseReportsController : Controller
             return View(nameof(Details), new ExpenseReportDetailsPage
             {
                 Report = report,
-                NewDetail = newDetail
+                NewDetail = newDetail,
+                AvailableCategories = await _categories.ListActiveNamesAsync(cancellationToken)
             });
         }
 
@@ -253,7 +259,8 @@ public sealed class ExpenseReportsController : Controller
             return View(nameof(Details), new ExpenseReportDetailsPage
             {
                 Report = report,
-                EditDetail = form
+                EditDetail = form,
+                AvailableCategories = await _categories.ListActiveNamesAsync(cancellationToken)
             });
         }
 

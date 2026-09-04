@@ -1,0 +1,25 @@
+@using ExpenseLite.Web.ViewModels.ExpenseCategories
+@model CreateExpenseCategoryForm
+
+@{
+    ViewData["Title"] = "新增類別";
+}
+
+<div class="el-page">
+    <div class="el-head">
+        <h1 class="el-title">新增類別</h1>
+    </div>
+
+    <form asp-action="Create" method="post" class="el-fields">
+        <div asp-validation-summary="ModelOnly" class="el-error"></div>
+        <div class="field">
+            <label asp-for="Name">類別名稱</label>
+            <input asp-for="Name" class="input" autocomplete="off" placeholder="例：交通、餐費、住宿" />
+            <span asp-validation-for="Name" class="el-error"></span>
+        </div>
+        <div class="el-actions">
+            <button type="submit" class="btn btn-primary">新增</button>
+            <a class="btn btn-secondary" asp-action="Index">取消</a>
+        </div>
+    </form>
+</div>

@@ -208,7 +208,22 @@
                         </div>
                         <div class="field">
                             <label asp-for="EditDetail.Category">類別</label>
-                            <input asp-for="EditDetail.Category" name="Category" class="input" autocomplete="off" />
+                            @{
+                                var editCurrent = Model.EditDetail?.Category;
+                                var editCats = Model.AvailableCategories;
+                                var editNeedsExtra = editCurrent is not null && !editCats.Contains(editCurrent);
+                            }
+                            <select asp-for="EditDetail.Category" name="Category" class="input">
+                                <option value="">── 請選擇 ──</option>
+                                @if (editNeedsExtra)
+                                {
+                                    <option value="@editCurrent">@editCurrent（已停用）</option>
+                                }
+                                @foreach (var cat in editCats)
+                                {
+                                    <option value="@cat">@cat</option>
+                                }
+                            </select>
                             <span asp-validation-for="EditDetail.Category" class="el-error"></span>
                         </div>
                         <div class="field">
@@ -252,7 +267,17 @@
                         </div>
                         <div class="field">
                             <label asp-for="NewDetail.Category">類別</label>
-                            <input asp-for="NewDetail.Category" class="input" autocomplete="off" placeholder="交通、餐費、住宿…" />
+                            <select asp-for="NewDetail.Category" class="input">
+                                <option value="">── 請選擇 ──</option>
+                                @foreach (var cat in Model.AvailableCategories)
+                                {
+                                    <option value="@cat">@cat</option>
+                                }
+                            </select>
+                            @if (!Model.AvailableCategories.Any())
+                            {
+                                <div class="el-hint">尚無類別，請主管先至「類別」頁新增。</div>
+                            }
                             <span asp-validation-for="NewDetail.Category" class="el-error"></span>
                         </div>
                         <div class="field">

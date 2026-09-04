@@ -1,0 +1,75 @@
+@using ExpenseLite.Application.ExpenseCategories
+@model ExpenseCategoryListPageDto
+
+@{
+    ViewData["Title"] = "費用類別";
+}
+
+<div class="el-page">
+    <div class="el-head">
+        <div>
+            <h1 class="el-title">費用類別</h1>
+            <p class="el-sub">新增報銷單明細時可選擇的類別清單</p>
+        </div>
+        <div class="el-actions">
+            <a class="btn btn-primary" asp-action="Create">新增類別</a>
+        </div>
+    </div>
+
+    @if (TempData["ErrorMessage"] is string errorMessage)
+    {
+        <div class="el-notice el-notice--warn">@errorMessage</div>
+    }
+    @if (TempData["SuccessMessage"] is string successMessage)
+    {
+        <div class="el-notice">@successMessage</div>
+    }
+
+    @if (Model.Categories.Count == 0)
+    {
+        <div class="el-notice el-notice--quiet">目前還沒有類別，請先新增。</div>
+    }
+    else
+    {
+        <table class="table el-table">
+            <thead>
+                <tr>
+                    <th>類別名稱</th>
+                    <th>狀態</th>
+                    <th>建立</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Categories)
+            {
+                <tr>
+                    <td class="strong">@item.Name</td>
+                    <td>
+                        <span class="tag el-status @(item.IsActive ? "el-status--submitted" : "el-status--cancelled")">
+                            @(item.IsActive ? "啟用中" : "已停用")
+                        </span>
+                    </td>
+                    <td class="nowrap el-readonly">@item.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</td>
+                    <td>
+                        <div class="el-cell-actions">
+                            @if (item.IsActive)
+                            {
+                                <form asp-action="Deactivate" asp-route-id="@item.Id" method="post">
+                                    <button type="submit" class="btn btn-ghost">停用</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="Activate" asp-route-id="@item.Id" method="post">
+                                    <button type="submit" class="btn btn-ghost">啟用</button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>

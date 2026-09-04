@@ -1,3 +1,4 @@
+using ExpenseLite.Domain.ExpenseCategories;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.CashAdvances;
 using ExpenseLite.Domain.Projects;
@@ -21,6 +22,8 @@ public sealed class ExpenseLiteDbContext
     public DbSet<CashAdvance> CashAdvances => Set<CashAdvance>();
 
     public DbSet<Project> Projects => Set<Project>();
+
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,8 +1,10 @@
 using ExpenseLite.Application.CashAdvances;
+using ExpenseLite.Application.ExpenseCategories;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Identity;
 using ExpenseLite.Application.Projects;
 using ExpenseLite.Infrastructure.CashAdvances;
+using ExpenseLite.Infrastructure.ExpenseCategories;
 using ExpenseLite.Infrastructure.ExpenseReports;
 using ExpenseLite.Infrastructure.Identity;
 using ExpenseLite.Infrastructure.Persistence;
@@ -51,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IExpenseReportRepository, EfExpenseReportRepository>();
         services.AddScoped<ICashAdvanceRepository, EfCashAdvanceRepository>();
         services.AddScoped<IProjectRepository, EfProjectRepository>();
+        services.AddScoped<IExpenseCategoryRepository, EfExpenseCategoryRepository>();
         services.AddScoped<IUserDirectory, IdentityUserDirectory>();
         services.AddScoped<IUserAccountStore, IdentityUserAccountStore>();
 

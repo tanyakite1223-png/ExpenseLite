@@ -1,4 +1,5 @@
 using ExpenseLite.Application.CashAdvances;
+using ExpenseLite.Application.ExpenseCategories;
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Home;
 using ExpenseLite.Application.Identity;
@@ -28,6 +29,7 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.AddScoped<ExpenseReportAppService>();
 builder.Services.AddScoped<CashAdvanceAppService>();
 builder.Services.AddScoped<ProjectAppService>();
+builder.Services.AddScoped<ExpenseCategoryAppService>();
 builder.Services.AddScoped<UserAccountAppService>();
 builder.Services.AddScoped<HomeAppService>();
 builder.Services.AddExpenseLiteInfrastructure(builder.Configuration);
