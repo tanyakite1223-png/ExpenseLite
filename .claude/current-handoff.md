@@ -1,561 +1,69 @@
 # ExpenseLite — Current Handoff
 
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
-> 內容聚焦「專案現況 + 架構狀態」，不是學習進度。
+> 功能清單、架構 pattern、設計決策、開發環境詳情 → `.claude/CONTEXT.md`
 
-> 最後更新：2026-09-05 — Sidebar 版型改版 Session 1（CSS + Layout 地基）。
-> 前次：2026-08-31 — UI 小修（已結清預支款隱藏修改按鈕、重設密碼頁補帳號說明、Layout 加 footer）。
-
----
-
-## 專案現況
-
-### 已完成功能
-
-**帳號與登入**
-
-- ASP.NET Core Identity 登入 / 登出；全站預設需要登入，例外要標 `[AllowAnonymous]`。**`[AllowAnonymous]` 目前只有兩個：登入頁與 AccessDenied**（自助註冊拿掉後收斂的，要新增對外端點時值得再數一次）
-- 兩種角色：員工 / 主管。登入帳號用 email 前綴,不是完整 email
-- **帳號兩態 `UserAccountStatus { Active, Disabled }`**
-- **沒有自助註冊。帳號只有兩個來源**：空系統時的 bootstrap，以及主管在使用者管理頁按「新增使用者」
-- **登入先驗密碼、再判帳號狀態**。用 `CheckPasswordSignInAsync` 只驗密碼不發 cookie，保留登入失敗鎖定；通過後才 `SignInAsync`。（狀態訊息只剩「已停用」一種，但這個順序仍然要維持——有差異就推得出帳號是否存在）
-- **使用者管理頁（限主管）**：新增使用者（可直接指定角色，建立即可登入）/ 啟用 / 停用 / 在員工與主管之間改角色 / 重設別人的密碼
-- **修改密碼頁**（每個人改自己的，要驗舊密碼）。**成功後刻意 `SignOutAsync` 並跳回登入頁**，訊息用 `TempData` 帶到登入頁上顯示——避免留在原頁時密碼欄位還在、讓使用者以為「還沒改成功要再改一次」。首次強制與主動修改走同一條收尾路徑。
-- **首次登入強制改密碼**（2026-08-16）—— 詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
-- **系統至少保留一位啟用中的主管**：停用最後一位主管、把最後一位主管降成員工，兩個入口都擋
-- **主管不能對自己動**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
-- **只剩一位日常主管時給紅色 alert**（2026-08-16）—— 詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
-- **緊急存取帳號（break-glass）**：bootstrap 建的 `Admin` 帶 `IsProtected`，不能停用、不能降級；登入時留 warning log、掛畫面橫幅、更新 `last_signed_in_at`
-- **Bootstrap 取代 seed**：角色每次開機確認；帳號只在 users 表為空時建一個主管 `Admin`，不再建 demo 帳號。自助註冊拿掉之後，**這是系統裡唯一「憑空生出帳號」的地方**——沒設 `Identity:SeedPassword` 的新環境就是真的沒有人進得去，沒有備援路徑
-- Identity 的英文錯誤訊息由 `ChineseIdentityErrorDescriber` 換成中文（只換句子，不改驗證規則）
-- Layout 右上角顯示登入者姓名與角色，並有「修改密碼」連結；「使用者」nav 只有主管看得到
-
-**權限（階段 4a + 4b + 5）**
-
-- **只有主管可以**：核准 / 退回 / 拒絕 / 作廢報銷單；建立 / 修改預支款、登記 / 修改 / 不採用結清紀錄；建立與結案專案；管理使用者。**但已結清預支款已鎖定**，主管也不能再修改主檔、修改結清紀錄或標記不採用。
-- **只有申請人本人可以**修改 / 送審 / 刪除草稿 / 取消退回單 / 復活取消單，**主管沒有例外**
-- **報銷單的可見度：主管看全部，其他人只看得到自己是申請人的**。列表、詳情、修改頁、**專案詳情頁的相關報銷單**都套同一條規則
-- **預支款列表與詳情所有登入者都進得去**，但內容依領款人過濾：主管看全部，員工只看自己是領款人的
-- 權限不足回 HTTP 403，導到 `/Account/AccessDenied`
-- 已實測繞過畫面的側門：直接 POST 送審別人的草稿、直接 POST 結清、直接開修改頁、直接打網址開別人報銷單的詳情頁、員工直接 POST `/Users/Activate`、直接開 `/Users/ResetPassword`，都被擋下。**2026-08-09 生命週期擴充新增的側門也已補驗**：Butter POST `/ExpenseReports/Delete/{amber 的草稿 ID}` → 302 到 AccessDenied、DB 未刪（`EnsureCanBeManagedByApplicant` 擋）；amber POST `/ExpenseReports/Void/{amber 自己送出並核准的單 ID}` → 302 回詳情頁、狀態仍 Approved（Domain `EnsureReviewerIsNotApplicant` 擋，跟審核用同一條）。**2026-08-16「主管動自己」側門也驗過**：amber POST `/Users/Disable/{amber-uid}` → 302 回 `/Users`、TempData 訊息「不能停用自己的帳號…」、DB 上 amber 仍 Active；amber POST `/Users/SetRole/{amber-uid}` role=Employee → 302 回 `/Users`、訊息「不能把自己降成員工…」、DB 上 amber 仍是主管
-
-**報銷單**
-
-- 報銷單列表；列表篩選：關鍵字、狀態、支出類型、付款方式、**顯示已取消**（軟刪的 Cancelled 預設隱藏，勾此才顯示）
-- 新增報銷單、報銷單詳細頁
-- 修改草稿 / 退回報銷單主檔欄位（申請人固定為建立者，不在修改範圍）
-- 新增 / 修改 / 移除草稿或退回報銷單的明細，明細金額加總到報銷單總額
-- 草稿 / 退回報銷單送審
-- 核准 / 退回 / 拒絕流程 UI；記錄審核人、審核時間、審核動作；退回 / 拒絕記錄原因
-- **審核人不能是申請人本人**（2026-08-08 補）：`Approve` / `Return` / `Reject` / `Void` 四個 domain method 都比對 `reviewerUserId ≠ ApplicantUserId`，違反丟 `DomainRuleViolationException`；申請人自己的詳情頁不畫那幾顆按鈕（純 UX，真擋在 `ExpenseReport.EnsureReviewerIsNotApplicant`）。跟緊急存取帳號同一類——主管有權審 / 作廢，只是這一次資料不合法。理由詳見 `docs/architecture/authorization.md` 的〈也不是授權，是報銷單自己的規則〉
-- 報銷單詳細頁顯示審核紀錄，以及對應的預支款
-- **付款方式三選一：員工墊款 / 個人預支 / 零用金支付**，依據是錢從哪來（見〈已定案的設計決策 / 預支款與零用金〉）
-  - 只有個人預支要綁預支款，其餘兩種都不綁
-  - 零用金支付的詳情頁會顯示「公司不需要再付款給申請人」
-- 明細單據類型：收據 / 發票，發票號碼必填
-
-**報銷單生命週期擴充（2026-08-09）**
-
-> 完整理由與圖見 `docs/architecture/expense-report-lifecycle.md`。這裡只列結果與紅線。
-
-- **主管作廢已核准報銷單**（`ExpenseReport.Void(...)`，Approved → Voided 終態、不可撤銷）
-  - 作廢原因必填；寫入審核紀錄（新 action `Voided`）
-  - `已核准報銷` 金額**即時扣除**（算式沒改；狀態從 Approved 離開就自動不算）
-  - 已計入的結清紀錄**完全不動**——留給主管手動判斷（差額方向可能反轉、可能要作廢原結清紀錄並補反向）
-  - 兩個提示時機：**作廢前**（詳情頁「作廢處理」form 旁的黃色警告 + `AdoptedSettlementRecordCount` + JS confirm）、**作廢後**（詳情頁 + 相關預支款詳情頁的持續提示 `VoidedRelatedReportCount`）
-  - 補救：不可撤銷，要救只能重打新單；第一階段刻意**不做「以此單為範本」複製按鈕**
-- **申請人硬刪自己的草稿**（Draft → 不存在）
-  - Repository `DeleteAsync` 直接 remove；草稿沒審核紀錄也沒結清紀錄綁著，刪掉沒後遺症
-- **申請人軟刪退回單 + 復活**（Returned ↔ Cancelled，`Cancel()` / `Restore()`）
-  - Cancelled 本身不可修改（`EnsureEditable` whitelist 沒收 Cancelled），要改先復活
-  - 列表預設隱藏、勾「顯示已取消」或明確篩 Cancelled 才顯示、詳情頁 URL 進得去
-  - 專案詳情頁的相關報銷單也預設隱藏 Cancelled
-- **草稿硬刪 vs 退回軟刪的不對稱**是刻意的：草稿沒進過主管視野，硬刪沒稽核成本；退回單有主管的退回紀錄，軟刪保留歷史（詳見架構文件）
-
-**預支款**
-
-- 預支款建立與核對列表；列表篩選：關鍵字、核對狀態
-- 領款人從使用者下拉選（只列 `Active` 的帳號）；**一人一筆，只有領款人本人的報銷單能引用**
-- 預支款用途說明與金額修改：**已結清後整筆鎖定**；未結清時用途可改，金額限「無報銷單引用」且「無已計入核對的結清紀錄」時才可改
-- **領款人建立後不可修改**
-- 實際結清紀錄：公司補付 / 員工繳回；詳情頁顯示結清紀錄
-- 結清紀錄修改（未結清時才可改；處理人維持原登記者，不會換成修改者）
-- 結清紀錄標記為不採用（未結清時才可標記；保留處理人、原因、時間，不是刪除資料）
-- **已結清後鎖定（2026-08-12）**：核對狀態為 `Settled` 時，預支款主檔、結清紀錄修改、標記不採用三個入口全部關閉；直接 POST 也由 `CashAdvanceAppService` 擋。這是第一階段保守做法，未來若需要更正，要另開正式更正流程。
-- 有流程中報銷單時顯示暫估核對，且不允許新增最終結清紀錄
-- **有已作廢報銷單引用時顯示提示**（2026-08-09 補）：`VoidedRelatedReportCount > 0` 就在頂部顯示黃色 alert，提醒主管去手動處理相關結清紀錄
-
-**專案**
-
-- 專案建立與專案列表；列表 keyword 查詢
-- 報銷單支出類型：一般支出 / 專案支出；專案支出報銷單可連到一筆 `Project`
-- 專案結案；有未完成報銷單時不可結案
-- 已結案專案不可新增專案支出報銷單，既有草稿 / 退回單也不可送審
-- 專案詳情頁可查詢該專案相關報銷單（依可見度過濾 + 排除 Cancelled），結案後仍可作為歷史查詢
-- **2026-08-12 修正 `/Projects` 查詢**：專案列表的未完成報銷單統計仍用 Draft / Submitted / Returned whitelist，但 repository 的 EF 查詢內不能呼叫 C# helper method，已改成查詢式直接列 enum 條件，避免 LINQ translation error。
-
-**列印報表（2026-08-16）**
-
-- `/ExpenseReports/Print?from=YYYY-MM-DD&to=YYYY-MM-DD`，未指定時預設「本月 1 號到今日」
-- **一頁兩用，靠 `ExpenseReportVisibility` 分視角**：員工只看自己（→ 整理已核准單交出納對照）、主管看全部（→ 看月度全公司支出）
-- **內容結構**：
-  - 頂部：期間顯示 + 總計（張數 / 金額）
-  - 中段：4 個分組總表（按申請人 / 按支出類型 / 按付款方式 / 按專案）；**員工版隱藏「按申請人」**（永遠只有自己一列，跟總計、下方大卡片小計重複），排版自動從 `col-md-3` 改成 `col-md-4`
-  - 底部：**依申請人分大卡片**——出納收到某員工一疊發票，就對這位員工那張卡片打勾。卡內含這人本區間所有已核准報銷單詳情
-- **只列 Approved、依「送審時間」篩選區間**——對員工「本月我報了什麼」、對主管「本月要處理的量」都對得上
-- **列印機制**：`@media print` CSS 隱藏 navbar / footer / form / 按鈕，`window.print()` 觸發；換申請人強制分頁，同一人多張連續排列。零 NuGet 套件
-
-### 尚未做（已知缺口）
-
-- **沒有完整登入稽核**。只記每個帳號「最後一次」登入時間，沒有歷次紀錄、沒有來源 IP、也沒有登入失敗的軌跡。緊急存取帳號的告警因此只能做到「留下痕跡讓人事後看到」，不是即時通知（見〈已定案的設計決策 / 緊急存取帳號〉）。
-- **停用帳號 / 改角色不是即時生效**。改完會換掉 security stamp，但 Identity 每 30 分鐘才重新驗證一次 cookie（`SecurityStampValidationInterval` 預設值），所以最慢會延遲到那時候。以「停用通常是離職不是緊急封鎖」的情境可以接受；要即時就得縮短間隔，代價是每次驗證多一次 DB 查詢。
-- 沒有附件或發票照片上傳。
-- **沒有「忘記密碼」自助流程**，只能請主管重設（同樣是沒有 SMTP 的後果）。
-- 沒有完整會計總帳、付款憑證、出納日記帳，**且本階段刻意決定不做**。
-- UI 版型改版進行中（見下方「版型改版」）。
-
-### 版型改版（進行中，共 5 個 session）
-
-**Session 1（2026-09-05）已完成：**
-- `wwwroot/css/site.css`：全新 sidebar 設計語言，取代 `expenselite.css`
-  - 深海軍藍 sidebar（#1C2333）+ 金色 accent（#C99A3C），字型改 Noto Sans TC（body）/ Noto Serif TC（標題）
-  - el-* 元件類別保留作**過渡橋接**，待後續 session 逐步移除；Bootstrap 相容層同樣保留
-  - Sidebar 改用 `position: sticky`（不用 fixed），zoom 時不跑位
-  - 列印樣式更新（隱藏 sidebar、body display 改 block）
-- `_Layout.cshtml`：改為 sidebar 結構；使用者姓名 / 角色 / 修改密碼 / 登出移入 sidebar footer
-- `_LayoutLogin.cshtml`：深色左欄（品牌）+ 白色右欄（表單）分割版型
-- **已知待補**：`.el-page--form` / `.el-page--narrow` 缺 `min-width`，縮小時部分表單頁會破版——等全部 view 改完後一次加進 CSS，不提早動
-
-**待辦（Sessions 2–5）：**
-- Session 2：Account（3）+ Home（2）+ Shared（2）
-- Session 3：Projects（3）+ Users（3）+ ExpenseCategories（2–3）
-- Session 4：CashAdvances（6）
-- Session 5：ExpenseReports（5，Details 最複雜）
-- 收尾：移除 el-* 過渡橋接與 Bootstrap 相容層；補 min-width
-
-**設計參考：** `expenselite-sidebar.html`（專案根目錄）
+> 最後更新：2026-09-05 — Sidebar 版型改版 Session 2（Account + Home + Shared）
 
 ---
 
-### build & DB
+## 現況
 
-- `dotnet build` 成功，0 warning / 0 error。2026-08-16 Amber 手動走完 A/B/C/D 四條驗證（建帳號 → 首次登入被攔、主管重設密碼 → 對方被攔、現有帳號不受影響、已改過的人不會被重複攔）。
-- **2026-08-16 新增 migration `AddRequirePasswordChange`**：純加欄位 `users.require_password_change`（bool，not null，default false），backfill 為 false——現有帳號完全不受影響，只有之後新建 / 被重設密碼的帳號才會被逼改。已套用桌機 DB。
-- **2026-08-12 沒有新 migration**——只改流程規則、Razor 入口與 EF 查詢寫法，schema 沒動。
-- **2026-08-09 沒有新 migration**——只加了兩個列舉值（`ExpenseReportStatus.Voided/Cancelled`）與一個 review action（`ExpenseReviewAction.Voided`），`enum 存字串`（`HasConversion<string>()`），schema 完全不用動。加值不像減值那樣有風險（減值時 DB 若有殘留字串會炸），加值只是「以後可能會出現的新字串」，DB 讀舊資料還是對得上。
-- **2026-08-08 拿掉 `Pending` 沒有產生新 migration**，schema 完全沒動。但**當時 DB 裡真的有一列 `'Pending'`（測試帳號 `Butter`），已用 `UPDATE users SET status='Active'` 處理掉**；不處理的話程式讀那一列會對不到列舉值而炸。教訓寫在〈疑難排解〉。
-- 桌機本機 DB 已套用最新 migration `20260807115526_AddProtectedAccountAndLastSignIn`。階段 6 共兩支：
-  - `20260807090203_ReplaceUserIsActiveWithStatus`——`users.is_active` bool 換成 `users.status` 字串。**這支是手改過的**：EF 原本生的順序是「先 DropColumn 再 AddColumn 空字串預設值」，會把既有帳號狀態洗掉，改成先加欄位、`UPDATE ... CASE WHEN is_active` 換算、最後才砍舊欄位。
-  - `20260807115526_AddProtectedAccountAndLastSignIn`——`users.is_protected`（預設 false）與 `users.last_signed_in_at`（可空）。純新增，沒有手改。
-- 本機連線字串與 Identity 初始密碼都透過 user secrets 設定，**不寫入 repo**（見〈開發環境狀態〉）。
+**版型改版進行中**，共 5 個 session；Session 1–2 已完成，Session 3 是下一步。
 
 ---
 
-## 架構狀態
+## Build 狀態
 
-> 跨 session 防止架構飄移的錨點，務必維護。
-
-### 已落地的 pattern
-
-- Controller → Application Service → Domain → Infrastructure
-- Rich Domain Model
-- `ExpenseReport` Aggregate Root
-  - `ExpenseDetail` 作為 aggregate 內部 entity
-  - `ExpenseReviewRecord` 作為 aggregate 內部 entity
-- `CashAdvance` Aggregate Root
-  - `CashAdvanceSettlementRecord` 作為 aggregate 內部 entity
-- `Project` Aggregate Root
-- `Money` Value Object
-- `IExpenseReportRepository` / `ICashAdvanceRepository` / `IProjectRepository`（一個 aggregate root 一個 repository）
-  - **`IExpenseReportRepository.DeleteAsync`**（2026-08-09 新增）：目前只用在申請人硬刪自己的草稿；軟刪走 domain method `Cancel()`
-- **`IUserDirectory`**（`Application/Identity` 定義介面、`Infrastructure/Identity` 用 `UserManager` 實作）——跟 repository 同一個依賴反轉的形狀，讓 Application 能查「系統裡有哪些人」而不必認識 Identity。**唯讀，只回姓名**
-- **`IUserAccountStore` + `UserAccountAppService`**——帳號的建立與維護（建立、狀態、角色、密碼）。跟 `IUserDirectory` 同一個形狀但**刻意分成兩個介面**：那個是唯讀的下拉選單來源，這個會改帳號；合在一起的話「只想畫個領款人下拉」的地方也會拿到重設別人密碼的能力
-- **`Application/ExpenseReports/ExpenseReportVisibility`**——「誰看得到一張報銷單」的單一出處，靜態類別，`ExpenseReportAppService` 與 `ProjectAppService` 共用
-- EF Core owned type mapping；enum 存字串
-- 列表查詢 DTO / 頁面 DTO 由 Application Service 組裝
-- ASP.NET Core Identity：cookie 登入、角色、custom claims principal factory、custom error describer
-- 登入者資訊經 `Application/Identity/CurrentUser` 這個 record 傳進 Application 與 Domain
-- **授權分兩種落點**：角色授權用 Controller 的 `[Authorize(Roles = ...)]`；資源授權（「這筆資料是不是你的」）在 Application Service
-- **`Application/Shared/ForbiddenOperationException`** 與 `DomainRuleViolationException` 分開，由 `Web/Filters/ForbiddenOperationExceptionFilter` 轉成 HTTP 403
-- **`Application/Identity/UserAccountResult`**——帳號操作的結果物件。存在理由見〈邏輯落點〉，不是隨手多包一層
-- **報銷單生命週期的完整狀態機**（2026-08-09）：7 個狀態、4 個 review action、申請人動作（`Submit/Cancel/Restore` + 硬刪草稿）與審核人動作（`Return/Approve/Reject/Void`）分開命名慣例——申請人動作無參數，審核人動作帶 reviewer 資訊。詳見 `docs/architecture/expense-report-lifecycle.md`
-- **`RequirePasswordChangeMiddleware`**（2026-08-16）—— 全站閘門，首次登入強制改密碼用。詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
-- **`PrintReportDto` 頁面 DTO + `@media print` 列印**（2026-08-16）——延伸「列表查詢頁面 DTO 由 App Service 組裝」的既有 pattern，另外多做兩件事：(a) 分組聚合（4 個維度小計 + 總計）在 App Service 一次算完、不下沉到 view；(b) 分組 label 的中文化也在 App Service（`ExpenseTypeLabel` / `PaymentMethodLabel` 小 helper），避免每個 view 各寫一套。View 只負責 `@media print` CSS 與 `window.print()` 觸發。零 NuGet 套件
-
-### Web 層目錄慣例
-
-- `/Web/Controllers`：MVC Controller，只接 HTTP、model binding、呼叫 Application Service、回傳 View。
-- `/Web/ViewModels`：表單與頁面模型，不是 Domain Model。
-- `/Web/Views`：Razor View，只負責畫面呈現與表單送出。
-- `/Web/Filters`：MVC filter，目前只有把 Application 例外轉成 HTTP 狀態碼這一支。
-- `/Web/Middleware`：ASP.NET Core middleware，目前只有 `RequirePasswordChangeMiddleware`（首次登入強制改密碼的全站閘門）。掛在 `Program.cs`，非個別 controller 適用時放這裡。
-- 根目錄不再保留 `/Controllers`、`/Models`、`/Views`。
-- `Program.cs` 有客製 Razor view location；之後新增 Razor View 要放在 `/Web/Views`。
-- `TempData` 訊息目前有三種：`SuccessMessage`、`ErrorMessage`、`WarningMessage`。**`WarningMessage` 目前沒有任何使用者**——它原本唯一的用途是 4b 的零用金提示，隨收斂一起消失。機制留著，之後有「不是成功、是提醒」的情境可以再用。
-
-### `/docs/architecture/` 已有的篇章
-
-- `layered-architecture.md`
-- `expense-report-aggregate.md`
-- `expense-report-lifecycle.md`（2026-08-09 新增：完整狀態機、Voided vs Cancelled 的不對稱、草稿硬刪 vs 退回軟刪的不對稱、結清紀錄完全手動 + 兩個提示時機、「未完成」判定改成 whitelist）
-- `money-value-object.md`
-- `repository-and-ef-core.md`
-- `cash-advance-reconciliation.md`（含〈為什麼零用金不是預支款〉與「已結清後鎖定」決策，是預支款收斂的完整理由出處）
-- `project-expense-reference.md`
-- `list-filtering-queries.md`（列表篩選在 Application、**列印報表也走同一種思路（2026-08-16 新增章節）**）
-- `identity-and-authentication.md`（認證：「你是誰」怎麼流進 Domain，含 `IUserDirectory`）
-- `authorization.md`（授權：「你能不能做」的兩種落點與判斷標準，含〈授權看的是「資料」，不是「頁面」〉）
-- `user-accounts.md`（帳號本身：帳號從哪裡來與**自助註冊的推翻紀錄**、兩態、登入順序、`IUserAccountStore` 為何獨立、緊急存取帳號、**首次登入強制改密碼、主管不能對自己動、只剩一位日常主管的提示（2026-08-16 新增三節）**、為什麼不做刪除使用者）
-
-### 有無偏離 CLAUDE.md 規範（技術債）
-
-**無明顯偏離。** 以下是各項邏輯落點的判斷理由，續作時照這個標準延續：
-
-放在 Domain entity（屬於單一 aggregate 自己的規則 / 狀態轉換）：
-
-- `ExpenseReport.Create(...)`——建立時就固定申請人的 UserId 與姓名快照
-- `ExpenseReport.UpdateBasicInfo(...)`——**不接**申請人參數，申請人建立後不可變
-- `ExpenseReport.EnsureBasicInfoIsValid(...)`——付款方式與預支款的搭配規則，收斂後只剩一條「只有個人預支綁預支款」
-- `ExpenseReport.UpdateDetail(...)`——由 root 控制可修改狀態並重新計算總額
-- `ExpenseReport.Return(...)` / `Approve(...)` / `Reject(...)` / **`Void(...)`**——狀態轉換並同步建立審核紀錄，帶入審核人 UserId 與姓名快照。**四個都擋「審核人 = 申請人」**（2026-08-08 補的 `EnsureReviewerIsNotApplicant`、2026-08-09 `Void` 加入同一條）
-- **`ExpenseReport.Cancel(...)` / `Restore(...)`**（2026-08-09 新增）——申請人動作，無參數。狀態轉換規則放 domain（Returned ↔ Cancelled 的合法性）；「只有申請人可以」是資源授權，放 Application Service，不放進 entity（避免污染 Domain API）
-- `CashAdvance.Create(...)`——建立時固定領款人 UserId + 姓名快照
-- `CashAdvance.UpdateBasicInfo(...)`——**不接**領款人參數；已計入核對的結清紀錄存在時不可改預支金額
-- `CashAdvance.UpdateSettlementRecord(...)` / `VoidSettlementRecord(...)`——aggregate 內部 entity 操作，一律走 root
-- `CashAdvanceSettlementRecord.Update(...)`——**不接**處理人參數，避免更正內容時改寫歷史
-- `Project.Close()`
-
-放在 Application Service（跨 aggregate 查詢、use case 編排、DTO 組裝、資源授權）：
-
-- `ExpenseReportAppService`：Project / CashAdvance 是否存在、Project 是否仍可用、列表篩選與 DTO mapping、報銷單詳情頁的預支款摘要組裝
-- **`ExpenseReportAppService.GetPrintReportAsync(...)`**（2026-08-16）——列印報表 page DTO：區間 + visibility 過濾 Approved 單、組 4 個維度的分組小計、每張詳情復用 `MapDetails`。**時區處理**：使用者輸入 `DateOnly` 綁本地 offset 成 `DateTimeOffset`，跟 UTC 存的 `SubmittedAt` 用絕對時刻比較，不會在時區交界處差一天。分組 label 中文化的 helper 也放這裡（跟 raw enum 對應集中一處）
-- `ExpenseReportAppService.EnsureCanBeEditedBy(...)`——「只有申請人能改」需要先載入報銷單才知道申請人是誰，所以不可能在 Controller 判斷
-- **`ExpenseReportAppService.EnsureCanBeManagedByApplicant(...)`**（2026-08-09 新增）——刪除 / 取消 / 復活共用一條授權規則，跟 `EnsureCanBeEditedBy` 邏輯相同（比對 `ApplicantUserId`）但訊息更廣，涵蓋三個非修改動作
-- **`ExpenseReportAppService.DeleteDraftAsync(...)` / `CancelAsync(...)` / `RestoreAsync(...)` / `VoidAsync(...)`**（2026-08-09 新增）——四個新的 App Service 方法，Delete/Cancel/Restore 前先 `EnsureCanBeManagedByApplicant`；Void 沒 App 層授權（Controller 用 `[Authorize(Roles = Manager)]` 擋、「不能作廢自己送的單」由 Domain 擋）
-- **`ExpenseReportAppService.GetAdoptedSettlementRecordCountAsync(...)`**（2026-08-09 新增）——算「這張報銷單所綁的預支款上有幾筆非不採用的結清紀錄」，Approved 詳情頁的作廢確認框、Voided 詳情頁的持續提示都用這個
-- `ExpenseReportVisibility.CanBeViewedBy(...)` / `EnsureCanBeViewedBy(...)`——同上，只是換成「能不能看」；**被抽成獨立靜態類別是因為有兩個呼叫點**（報銷單自己的列表詳情、專案詳情頁的相關報銷單），複製一份遲早只改到其中一邊
-- `CashAdvanceAppService.EnsureCanBeViewedBy(...)` / `CanBeViewedBy(...)`——「主管或領款人本人才看得到」，同樣要先載入才知道領款人是誰。**目前只有一個呼叫點，所以仍是該 service 的私有方法**，等長出第二個呼叫點再抽，不預先統一
-- `CashAdvanceAppService.CanBeReferencedBy(...)`——**這不是授權而是模型規則**：換一個角色答案不會變（主管也不能拿別人的預支款報自己的單）。收斂後縮成一行 `cashAdvance.PayeeUserId == viewer.UserId`
-- `CashAdvanceAppService.CreateAsync(...)`——姓名快照由這裡查 `IUserDirectory` 取得，**不接受表單送進來的字串**，避免竄改表單讓名字與帳號對不上
-- `CashAdvanceAppService`：預支款是否已有報銷單引用、是否仍有流程中報銷單、差額 / 尚待結清金額計算、核對 DTO 組裝
-- **`CashAdvanceAppService.EnsureCashAdvanceIsNotSettled(...)`**（2026-08-12 新增）——已結清後鎖定預支款主檔、結清紀錄修改、標記不採用。這條放 Application Service，因為「已結清」不是 `CashAdvance` 自己能單獨判斷，必須同時看已核准報銷金額與有效結清紀錄。
-- **`CashAdvanceAppService.GetVoidedRelatedReportCountsAsync(...)`**（2026-08-09 新增）——「每筆預支款上有幾張已作廢的報銷單」，供預支款詳情頁「作廢後的持續提示」使用
-- 專案是否仍有未完成報銷單、報銷單送審 / 修改時專案是否已結案
-- `ProjectAppService.GetDetailsAsync(...)`——專案詳情頁的相關報銷單查詢（由 `ProjectId` 查 `ExpenseReport`），並套 `ExpenseReportVisibility` 過濾（**2026-08-09 起也排除 Cancelled**，跟報銷單列表一致）
-- 報銷單 / 預支款 / 專案的列表篩選與 keyword 查詢（查詢 / 呈現需求，不進 Domain）
-- **「未完成報銷單」判定全面改成 whitelist**（2026-08-09）：原本用 blacklist 排除 Approved/Rejected，改成明列 Draft/Submitted/Returned。三處都改：`EfExpenseReportRepository.CountUnfinishedProjectReportsAsync` / `HasUnfinishedProjectReportsAsync`、`ProjectAppService.CountUnfinishedReports`。動機：新增狀態時**預設不算未完成**比較安全（Voided/Cancelled 都不流動了，就不該算未完成）。**2026-08-12 修正實作細節**：repository 的 `IQueryable` 不能呼叫私有 C# helper method，whitelist 條件要直接寫在 LINQ expression 裡，否則 `/Projects` 會發生 EF Core LINQ translation error。
-- **`UserAccountAppService.EnsureNotLastActiveManagerAsync(...)`**——「系統至少要保留一位啟用中的主管」。這條**跨多個使用者**，照 §4.2 本來會是 Domain Service，但本專案的使用者刻意不是 Domain 的一員（`ApplicationUser` 繼承 Identity 型別、住 Infrastructure，Domain 只用 Guid 參照人）。要放進 Domain 就得先把使用者整個搬進去，代價遠大於一條規則。**這是誠實的例外，不是偷懶**，理由詳見 `docs/architecture/user-accounts.md`
-- `UserAccountAppService.DisableAsync(...)` / `SetRoleAsync(...)` 的緊急存取帳號檢查——同上，也需要先讀資料才知道那個帳號是不是受保護的
-- **`UserAccountAppService.DisableAsync` / `SetRoleAsync` 的「不能對自己動」檢查** —— 〈邏輯落點〉見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
-- **`UserAccountAppService.CountActiveDailyManagersAsync`** —— 〈邏輯落點〉見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
-- **`UserAccountResult` 為什麼不是例外**：建立帳號時「帳號重複 + Email 重複 + 密碼太短」可能同時發生，Identity 本來就回一整包，用例外只能丟第一條；也順帶擋住 `IdentityResult` 漏進 Application。分界線是「使用者自己能修正的走 result 進 ModelState，違反業務規則的（最後一位主管、緊急帳號、找不到帳號）照舊丟例外」
-- **首次登入強制改密碼的三個寫入點** —— 〈邏輯落點〉見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
-
-授權的分層落點（理由詳見 `docs/architecture/authorization.md`）：
-
-- **不用讀資料庫就能判斷的擋在 Controller**（角色），**需要讀資料才知道的擋在 Application Service**（擁有者）。
-- `CashAdvancesController` 只在「會動資料」的 action 標 `[Authorize(Roles = Manager)]`；列表與詳情由 Application Service 過濾。**能用角色表達的就用 `[Authorize]`，表達不了的才往下沉。**
-- `UsersController` 整個類別標 `[Authorize(Roles = Manager)]`——使用者管理沒有任何「同一份資料、不同人看到不一樣」的情況，用角色表達得完，不需要下沉。
-- `ExpenseReportsController.Void` 也用 `[Authorize(Roles = Manager)]`——作廢跟核准 / 退回 / 拒絕同一類；「不能作廢自己送的單」由 Domain 擋（跟審核同一條 `EnsureReviewerIsNotApplicant`）
-- `ExpenseReportsController.Delete/Cancel/Restore` **不加角色 attribute**，因為「主管也不能刪別人的草稿」——身分是資源擁有者而非角色，擋在 App 層 `EnsureCanBeManagedByApplicant`
-- **「緊急存取帳號不能停用 / 降級」不是授權而是業務規則**：主管本來就有權限做這件事，只是這一次不合法（跟「專案有未完成報銷單時不能結案」同一類），所以丟 `DomainRuleViolationException` 而不是 `ForbiddenOperationException`。
-- `CurrentUser` 有 `IsManager`：純角色檢查仍留在 `[Authorize]`，但「同一份資料，主管看得比較多」`[Authorize]` 表達不出來，Application 就得知道呼叫者是不是主管。`CurrentUser` 是 Application 自己的型別，加這個布林不會讓 Application 綁到 Identity；**Domain 仍然完全不認識角色**。
-- **授權要看「資料」，不是「頁面」**（階段 5 學到的）：專案詳情頁本身所有人都進得來，但頁上列的是報銷單，就得照報銷單的可見度過濾，否則員工被擋在 `/ExpenseReports` 外面卻能從專案頁看到同事的單。**新增任何會列出報銷單的畫面時，先問這一頁上的資料是誰的。**
-- **統計數字也算資料**：專案頁的「未完成報銷單」「報銷單總數」跟著過濾後的清單算。除了洩漏「別人有幾張單」之外，更實際的理由是列表與詳情若一邊過濾一邊沒過濾，同一個專案會出現兩個互相矛盾的數字。
-- 「只有申請人能改 / 能看」**刻意不放進 entity**：報銷單自己的 invariant 是「草稿或退回才能改」，不管誰來改都成立；「必須是本人」是存取控制。放進 entity 會讓每個 domain method 都要多接 `currentUser` 參數，污染 Domain API。同理 `Cancel/Restore` 也不接 UserId。
-- **Tradeoff 老實記著**：因此新增 Application Service 方法時若忘了呼叫 `EnsureCanBeEditedBy` / `EnsureCanBeViewedBy` / `EnsureCanBeManagedByApplicant`，Domain 不會幫你擋。這跟 aggregate 邊界一樣是靠約定維持的紀律。（「審核人 ≠ 申請人」曾經是這條 tradeoff 的實例——2026-08-06 發現時沒人寫那條檢查，兩層都不會擋；2026-08-08 補進 Domain 而不是 Application Service，因為它是「資料是否合法」而非「誰可以呼叫」，理由詳見 `docs/architecture/authorization.md` 的〈也不是授權，是報銷單自己的規則〉。）
-- **View 隱藏按鈕不是權限**，只是 UX；真正的把關永遠在 `[Authorize]` 或 Application Service。兩層都要有。（使用者列表對受保護帳號不畫停用 / 改角色按鈕，但真正擋下來的是 `UserAccountAppService`，已用直接 POST 驗過。）
-
-Identity 的分層落點（理由詳見 `docs/architecture/identity-and-authentication.md`、`user-accounts.md`）：
-
-- `ApplicationUser` 放 `Infrastructure/Identity`——它繼承 `IdentityUser<Guid>`，直接依賴框架，不能進 Domain。
-- 角色常數 `ExpenseLiteRoles`、帳號狀態 `UserAccountStatus` 放 `Application/Identity`——「員工 / 主管」「帳號能不能用」是業務概念，Web 與 Infrastructure 都要用。
-- `CurrentUser` 放 `Application/Identity`——Application 只認識它，不認識 `ClaimsPrincipal`；由 Controller 呼叫 `User.ToCurrentUser()` 轉換，Application Service 不碰 `HttpContext`。
-- `IUserDirectory` / `IUserAccountStore` 放 `Application/Identity`、實作放 `Infrastructure/Identity`。`ListSelectableAsync` 只列 `Active`（不該把錢指派給已離職的人），`FindByIdAsync` 不過濾（帳號停用後歷史紀錄上的人還是要查得到）。
-- `ApplicationUserClaimsPrincipalFactory`、`ChineseIdentityErrorDescriber` 放 `Infrastructure/Identity`——都是 Identity 的擴充點，屬於框架整合。
-- **`protected_account` claim 只用來畫畫面**（掛橫幅），**不做權限判斷**——claim 是登入當下的快照，權限要讀資料庫。
-- **登入 / 登出 / 改自己的密碼留在 `AccountController`**：發 cookie 本來就是 Web 的事。**建立帳號則在 `UsersController`**（2026-08-08 從 `AccountController` 搬過去），因為它已經不是「訪客替自己做的事」而是「主管的管理動作」——端點放在哪個 controller 決定了它繼承誰的 `[Authorize]`。兩邊的邏輯都在 `UserAccountAppService`，Controller 只負責轉換與顯示。
-- **`CreateUserCommand` 帶角色，而它的前身 `RegisterUserCommand` 把角色寫死成員工**——差別在呼叫者是誰。自助註冊的入口對未登入的人開放，讓表單決定角色等於開放任何人自封主管；現在唯一的入口在 `[Authorize(Roles = Manager)]` 後面。**這是把關換位置，不是變鬆。**
-- **Domain 不認識 `ApplicationUser`**；記「是誰做的 / 給了誰」時只存 `Guid` 形式的 UserId，比照跨 aggregate 用 ID 參照的規則。
-
-aggregate 邊界紀律：
-
-- `ExpenseDetail`、`ExpenseReviewRecord` 只透過 `ExpenseReport` 操作，沒有獨立 repository。
-- `CashAdvanceSettlementRecord` 只透過 `CashAdvance` 操作，沒有獨立 repository。
-- 報銷單只用 `CashAdvanceId`、`ProjectId` 參照，沒有把整顆 CashAdvance / Project 抓進報銷單 aggregate。報銷單詳情頁的預支款摘要是**查詢時才組進 DTO**，不是 entity 上的 navigation。
-- **`AdoptedSettlementRecordCount` / `VoidedRelatedReportCount`**（2026-08-09）也是查詢時才組進 DTO 的統計數字，跨 aggregate 用 App Service 現查（見〈邏輯落點〉）——Domain entity 不知道對方存在。
-
-### 後續可能優化
-
-- 列表篩選與可見度過濾目前先在 Application Service 對 `ListAsync()` 結果做 in-memory 處理，有三處：報銷單列表、預支款列表（`CanBeViewedBy`）、專案詳情頁的相關報銷單。資料量變大時，可新增查詢專用 repository method 把條件下推到 EF Core / PostgreSQL。
-  - **已經下推的有一處可當範本**：`CountUnfinishedProjectReportsAsync(applicantUserId)`。它本來就是 group by 查詢，多帶一個 where 比把全部報銷單載進記憶體再過濾划算。
-- `IdentityUserAccountStore.ListAllAsync` 是 N+1：先撈所有使用者，再對每人查一次角色。十人內無所謂，換來的是最直白的答案；人數變多再改成 join `user_roles` 一次撈完。
-- 預支款詳情 / 結清同樣用 `ListAsync()` 查報銷單後在 Application Service 聚合；資料量變大時可下推到 EF Core group query。**含 2026-08-09 新增的 `GetVoidedRelatedReportCountsAsync`。**
-- 結清紀錄目前只有 `UpdatedAt`、沒有「這次是誰改的」。真的需要時再加 `UpdatedByUserId`。
-- `ExpenseReportAppService` 裡的 `GetProjectNameAsync(...)` 是沒有呼叫者的死碼（不會編譯警告）。順手改到那一帶時可以清掉。
-- **「已核准報銷」即時重算的缺口已補一半**：2026-08-09 加了作廢流程之後，主管有正式的路把已核准單撤下來（會即時扣掉那張單的金額 + 顯示提示提醒去處理結清紀錄）。2026-08-12 又鎖住了「已結清後修改預支款 / 修改結清紀錄 / 標記不採用」三個更正入口。**但仍沒鎖定「已結清後又被新單引用並核准」這條路**——一筆已結清的預支款，若領款人本人再開新單並被核准，差額會再度變動、原本已結清的紀錄方向可能就反了。收斂成一人一筆之後風險已小（只有領款人本人開得了新單），但問題還在——參考解法可能是「已結清後鎖定引用」或「已結清後鎖定該預支款的新單建立」。
+- `dotnet build` 成功，0 warning / 0 error
+- 最新 migration：`AddRequirePasswordChange`（2026-08-16），已套用桌機 DB
+- user secrets 正常（`ConnectionStrings:ExpenseLite`、`Identity:SeedPassword`）
 
 ---
 
-## 已定案的設計決策
+## 版型改版進度
 
-> 這些是 Amber 已經拍板的，續作時不要再推翻或重新設計。
+**設計參考：** `463977.jpg`（專案根目錄，未進 repo）
 
-### 使用者與責任歸屬
+### Session 1（2026-09-05，完成）
+- `wwwroot/css/site.css`：全新 sidebar 設計語言（深海軍藍 #1C2333 + 金色 #C99A3C）
+  - `el-*` 元件類別保留作過渡橋接；Bootstrap 相容層同樣保留
+- `_Layout.cshtml`：sidebar 結構
+- `_LayoutLogin.cshtml`：左深色品牌欄（固定 520px）+ 右白色表單
 
-- **角色只有兩種：員工 / 主管**。審核與預支款 / 結清作業都歸主管，不另設會計或系統管理員角色。**`Admin` 不是第三種角色**，它是一個角色為主管的帳號。
-- **登入帳號用 email 前綴**（`Admin`、`amber`），不是完整 email。email 欄位保留，供之後密碼重設等用途。
-- **「是誰做的」一律存兩個欄位**：`Guid?` 形式的 UserId（給程式比對用）+ 姓名字串（給人看的歷史紀錄）。姓名是**寫入當下的快照**，使用者日後改名不會改寫歷史；UserId 可為 null，代表這筆資料早於登入功能。
-- **操作者才自動帶入登入者，當事人不會**。預支款的**領款人是「當事人」**，所以不自動帶登入者——主管很可能替員工建立預支款。但「不自動帶登入者」不等於「只能存字串」：領款人一樣存 `PayeeUserId` + 姓名快照，只是 UserId 來自主管挑的人。
-- **申請人 = 建立報銷單的人**，建立後不可修改。**領款人建立後也不可修改**——換掉領款人等於改寫「這筆錢當初給了誰」。有些欄位是「這筆資料的身分」，不是可編輯的內容。
-- **修改結清紀錄不會換掉處理人**：處理人是當初登記那筆結清的人，別人來更正金額 / 備註都不會蓋掉。
-- **主管沒有「代改草稿」的代理權**（2026-07-31 定案）：只有申請人本人能修改 / 送審自己的草稿，主管的角色是審核，不是代改。理由：目前沒有記錄「誰送審」，主管代送會讓責任歸屬變模糊——單子看起來像員工自己送的。
-- **主管本人也可以建立報銷單**（老闆自己也會花錢）。**但主管不能核准（也不能退回 / 拒絕 / 作廢）自己送出的單**——`Approve/Return/Reject/Void` 四個都擋。所以要有另一位主管負責審才行（見〈已完成功能 / 報銷單〉的「審核人 ≠ 申請人」條目）。
-- **員工彼此看不到對方的報銷單**（2026-08-06 定案，階段 5 已實作）：報銷單上有金額、用途、單據號碼，是別人的私事。主管看得到全部，因為審核是他的工作。
-- **專案的建立與結案限主管**（2026-07-31 定案）：結案會擋掉其他人的報銷單送審，不該讓員工做。專案列表與詳情維持所有人可看，因為員工建報銷單要選專案。
+### Session 2（2026-09-05，完成）
+- `Web/Views/Shared/_LoginPartial.cshtml`：刪除（無任何 @Html.Partial 引用）
+- `Web/Views/Shared/Error.cshtml`：移除 `el-lede--single`；`el-facts` 補 `el-facts--nowrap`
+- `Web/Views/Account/Login.cshtml`：input / button 固定 300px；所有錯誤集中在按鈕上方；移除 `_ValidationScriptsPartial`
+- `Web/Views/Account/ChangePassword.cshtml`：`class=""` 空屬性改 `null`
+- `Web/Views/Account/AccessDenied.cshtml`：補紅色盾牌 SVG icon；說明改 `el-lede`
+- `Web/Views/Home/Index.cshtml`：移除過期規劃注解
+- `Web/Controllers/AccountController.cs`：Login POST `!ModelState.IsValid` 改為統一回「帳號或密碼不正確。」
+- `wwwroot/css/site.css`：補 `.login-form-body`、`.el-facts--nowrap`、`.el-access-denied-icon`
 
-### 帳號生命週期（2026-07-27 初版，2026-08-08 大幅推翻）
+### Session 3（下一步）
+- Projects（3 views）
+- Users（3 views）
+- ExpenseCategories（2–3 views）
 
-> **完整理由見 `docs/architecture/user-accounts.md` 的〈推翻紀錄：原本有自助註冊〉。** 這裡只留結論與紅線。
-
-- **主管建立 → 用 → 停用（主管）**。帳號只有兩個來源：bootstrap 與主管在使用者管理頁建立。
-- **已推翻 2026-07-27 的「員工自助註冊 → 主管啟用」**。推翻的原因是實際測試撞出來的：已註冊、忘記自己註冊過的人再註冊一次，系統只能回「帳號已經有人用了」，**不能**告訴他「這是你上次送出的申請」——註冊頁對未登入者透露帳號狀態等於送出員工名單。而 OWASP 對這題的標準解法（不論重複與否都回「已寄出確認信」，真相只放進信箱）**前提是有 email 通道，本專案沒有 SMTP**，照抄只會讓人卡在一個什麼都沒發生的畫面上。改成主管建帳號之後，這個兩難不是被解決，是**被取消**——看到訊息的人是主管，他在使用者列表上本來就看得到全部帳號。
-- **不要再提議把自助註冊做回來。** 除非先有 SMTP，否則會原地繞回同一個死結。
-- **已推翻三態，收斂成 `UserAccountStatus { Active, Disabled }`**（2026-08-08）。`Pending` 唯一的來源是自助註冊，拿掉註冊之後它就是個沒有人走的死狀態。決策當下確認過「先建帳號、過幾天才讓他登入」不會發生——實際流程是主管建好帳號、**當場**把帳號與預設密碼交給本人，本人再自己改密碼。
-- **建立的帳號一出生就是 `Active`**，角色由主管在建立表單直接選（員工 / 主管），之後也能在列表上改。
-- **預設密碼由主管填、當面交給本人**，跟「重設密碼」同一套做法。系統只能用文案提醒本人去改，擋不住他不改（見〈已知缺口〉）。
-- **登入先驗密碼、再判帳號狀態**。狀態訊息現在只剩「已停用」一種，但順序仍然不能反——有差異就能靠訊息推斷帳號是否存在（account enumeration）。
-- **系統至少要保留一個啟用中的主管**：最後一個主管不能被停用、也不能被降成員工，否則全公司進不去且無後門。
-- **正式區 bootstrap**：users 表為空時自動建**一個**帳號 `Admin`（顯示名稱「管理者」，角色主管），密碼取自 `Identity:SeedPassword`。上線後第一件事是用「修改密碼」頁換掉它，換完可把主機上的該設定值移除。
-- 選 bootstrap 而不是「第一個註冊的人自動變主管」的理由：bootstrap 在第一次啟動時就完成，那時還沒人能連進來，**不存在搶註冊的空窗期**；行為也可預測。自助註冊拿掉後那個替代方案自然消失，但這仍是程式碼長這樣的出處。
-- **角色（roles）每次開機都確認**，跟帳號不同。少了角色 `[Authorize(Roles = ...)]` 會全站默默失效，補一下很便宜。
-
-### 緊急存取帳號 / break-glass（2026-08-07 定案並實作）
-
-- **`Admin` 的定位是緊急存取帳號**，不是日常帳號。主管平常用自己的帳號，`Admin` 只在「沒有其他主管進得來」時使用。這是業界標準模式（Microsoft Entra ID 建議每個租戶留兩個、AWS root account 同理）。
-- **要解決的是「至少一位啟用中的主管」擋不住的那一種鎖死**：唯一的主管忘記密碼，重設需要主管權限，他自己又進不來。
-- **不能停用、不能降成員工**，連主管也不行。判斷依據是帳號上的 `IsProtected` 旗標，**不是比對帳號名稱**——名字可以改，靠字串認太脆。
-- **旗標只有 bootstrap 建立第一個帳號時會設**，UI 沒有任何地方能開關。增減緊急帳號是刻意的手動 SQL 動作（SQL 寫在 `docs/architecture/user-accounts.md`）。理由：新增或撤掉一個緊急帳號不該是點兩下就完成的事。
-- **保護的是「進得來」，不是「不能被換掉」**：任何主管隨時能用「重設密碼」換掉它的密碼，那正是密碼外流時的處置方式。
-- **告警三路留在系統內**（沒有 SMTP，§4.8 也鎖住雲端服務）：伺服器 warning log、畫面紅色橫幅、使用者管理頁的「最後登入」。**第三路才是真正有用的**——log 沒人看、橫幅只有當事人看得到，只有列表上的時間是別人事後查得到的。
-- **搭配的人為約定**（系統管不到，但屬於這個設計的一部分）：密碼不能只存在某個人腦袋裡（要寫下來鎖進保險箱或密碼管理工具），而且要定期登入測試——沒被試過的緊急帳號等於不存在。
-
-### 不做刪除使用者（2026-08-07 定案）
-
-- **系統只能停用帳號，沒有刪除功能，而且是刻意的。**
-- 理由：報銷單、預支款、審核紀錄、結清紀錄上都存著 `Guid` 形式的 UserId，而且**業務資料表對 `users` 沒有外鍵**（只有 Identity 自己的表有）。刪掉一個人，資料庫不會擋也不會連帶刪，那些 Guid 只是變成指向不存在的人。
-- 後果很具體：姓名快照還在、畫面看起來正常，但「這張單是不是我的」永遠判斷不出來——他名下的草稿沒有人能修改或送審，他名下的預支款再也不能被任何新報銷單引用。
-- **停用才是對的模型：不能登入，但歷史查得到。** 如果日後有人想加刪除按鈕，先回頭看 `docs/architecture/user-accounts.md` 的〈為什麼沒有「刪除使用者」〉。
-
-### 報銷單生命週期擴充（2026-08-09 定案並實作）
-
-> **完整理由見 `docs/architecture/expense-report-lifecycle.md`。** 這裡只留結論與紅線。
-
-處理三種情境：**(a) 選錯預支款、(b) 內容有誤、(c) 整張單根本不成立**——按單子當時的狀態分流到不同路徑，不用同一個入口涵蓋。
-
-**四條新路徑（分屬兩個當事人）**：
-
-| 動作 | 誰能做 | 從哪來 | 到哪去 | 能反悔嗎 | 要理由嗎 |
-| --- | --- | --- | --- | --- | --- |
-| 刪除草稿（硬刪） | 申請人 | `Draft` | 不存在 | 不能 | 不用 |
-| 取消退回單（軟刪） | 申請人 | `Returned` | `Cancelled` | 能，`Restore` 回 `Returned` | 不用 |
-| 復活軟刪單 | 申請人 | `Cancelled` | `Returned` | — | — |
-| 作廢已核准單 | 主管，且不能是申請人 | `Approved` | `Voided`（終態） | **不能** | 必填 |
-
-**核心紅線**：
-
-- **作廢不可撤銷，要救只能重打新單。** 這是業界主流（Concur / Zoho / QuickBooks 都這樣），核心是「已核准過的單就算作廢，那件事發生過」的稽核鏈不能斷。
-- **不做「以此單為範本」按鈕**（第一階段刻意跳過）——多一個永久欄位跟一堆對應顯示邏輯不划算。
-- **作廢時結清紀錄完全手動**：作廢只改單子狀態、`已核准報銷` 金額即時扣除；已計入的結清紀錄一律不動，留給主管手動判斷（可能要作廢原結清紀錄並補反向結清）。
-- **兩個提示時機補位**：作廢前確認框告知後果、作廢後在報銷單詳情頁 + 相關預支款詳情頁持續提示。缺一不可——前者防當下手滑，後者防事後遺忘。
-- **草稿硬刪、退回軟刪的不對稱是刻意的**：草稿沒進過主管視野，硬刪沒稽核成本；退回單有主管的退回紀錄，軟刪保留歷史。**代價老實記著**：「所有存在過的報銷單」不再是等量集合，草稿刪了就是不見了。
-- **Cancelled 可復活、Voided 不可撤銷的不對稱**也是刻意的：核心差異是「有沒有動過錢」——Voided 動過，Cancelled 沒有。
-- **狀態列舉現在有 7 個值**（Draft / Submitted / Returned / Approved / Rejected / Voided / Cancelled），review action 有 4 個（Returned / Approved / Rejected / Voided）。加狀態時，`EnsureEditable` 與「未完成」判定都是 whitelist，預設「不可修改、不算未完成」，比較安全。
-
-### 預支款與零用金（2026-08-05 定案，2026-08-06 實作完成）
-
-> **完整理由與推翻過程見 `docs/architecture/cash-advance-reconciliation.md` 的〈為什麼零用金不是預支款〉。** 這裡只留結論與紅線。
-
-- **零用金不是預支款。** 預支款是公司先撥給某個人的錢，一人一筆、多退少補；零用金是由保管人看管的定額基金，額度不變、沒有結束的一天。兩者放進同一條核對算式必然算錯。
-- **已推翻 2026-07-31 的「預支款區分個人預支 / 零用金」決策**，`CashAdvanceUsage` 已移除。**不要再提議把零用金做回預支款**——那個設計會讓「差額 = 已核准報銷 − 預支金額」對零用金失去意義，大家報滿額度時系統判定「已結清」，現實中那正是該補撥回抽屜的時刻，方向剛好相反。
-- **預支款收斂成一人一筆的個人預支**，只有領款人本人的報銷單能引用。
-- **零用金是一種付款方式，不是一筆資料。** 付款方式三選一，依據是錢從哪來：員工墊款（自己的錢先出，公司要還）／個人預支（公司先給的錢，必須綁預支款）／零用金支付（錢從抽屜出，公司不用再付）。
-- **不設金額門檻。** 大筆走墊款、小筆走零用金只是現實的相關性，不是規則。綁死會卡住「抽屜空了所以自己先付 300」這種正常情況。
-- **付款方式留在報銷單層級，不下沉到明細。** 一疊單裡混了兩種來源就分成兩張報銷單。理由：十人公司分兩張不是負擔，分開對出納更清楚；下沉到明細的話，個人預支要綁的預支款不知道掛哪，整套核對邏輯要改寫成按明細加總。
-- **零用金支付的報銷單一樣要走核准**，不按金額分流。錢雖然當場付掉了，單據還是得主管認可，不然抽屜變成沒人看的黑洞。
-- **抽屜裡的現金餘額不進系統**，由保管零用金的設計師自己記錄。系統只做「標記 + 事後篩選統計」——報銷單列表既有的付款方式篩選就能撈出「這期間零用金花了多少」，不另做請撥功能。
-- **老實記著這個簡化的限制**：系統沒有「付款」這個動作（已定案不做會計帳），所以「零用金支付」目前**只是一個標記，後面沒有任何行為掛在上面**。價值在於主管審核時看得出這張單不用再付錢、以及事後篩選。這是刻意取捨，不是缺陷。
-
-### 專案與代墊
-
-- **「專案支出」的意義是分類與歸屬**（這筆花費算在哪個專案頭上），**不是請款依據，也不是專案損益**。不要期待專案詳情頁能算出專案賺賠。
-- **代墊客戶購買商品的「向客戶請款」不進系統**（2026-08-05 定案）。切的是當事人的界線：報銷是公司 ↔ 設計師，請款是公司 ↔ 客戶；就算客戶賴帳，設計師的錢還是要還，兩者不該互相牽制。做請款等於要做應收帳款、客戶主檔、發票開立，超出本階段範圍；而且業務的請款單本來就含設計費、工時、代墊物料好幾塊，報銷系統只握有代墊那一小塊，做進來只會是個資訊不完整的請款來源。
-- **「業務靠專案詳情頁看到全部代墊資料」這個用途已經作廢**（2026-08-06 Amber 決定「這段現在用不到了」）。它原本是 2026-08-05 記下來的、支持專案詳情頁不過濾的唯一理由；用途取消後，專案詳情頁就跟報銷單本身套同一條可見度規則。**下次若有人重新提議「專案頁要看得到全部代墊」，要先確認那個用途是不是真的回來了**，不是照舊寫法推回去。
-
-### 結清紀錄
-
-- **不做沖銷 / 會計帳**：不保留 `Reversal` 型態，不做付款憑證、出納日記帳、會計帳務沖銷。
-- **「不採用」的對象是「一筆結清紀錄」，不是報銷單、也不是預支款。** 結清紀錄是主管登記的一句「這筆差額的錢實際上找補過了」；不採用就是撤回這句宣稱（金額登錯、錢其實沒動、重複登記）。UI 文案用「不採用此筆結清紀錄」。2026-08-12 起，已結清預支款上的結清紀錄也不能再標記不採用。
-  - 只影響這筆結清紀錄，不影響預支款、不影響報銷單。
-  - 不會改變 `已核准報銷`、`差額`、`應結清`——這三個是「預支金額 vs 已核准報銷單金額」算出來的，跟結清紀錄無關。
-  - 會改變 `已結清`、`尚待結清`、核對狀態。
-  - 不採用不是刪除；紀錄仍顯示在詳情頁歷史中，且從此凍結不可再修改。詳情頁狀態欄顯示「已計入核對 / 不採用」。
-- **結清金額規則**：`尚待結清 = 應結清 - 已計入核對的有效已結清`；已結清金額只加總仍被採用的結清紀錄。可分次結清，系統只擋超過尚待結清的金額。
-- **暫估規則**：同一筆預支款若仍有 Draft / Submitted / Returned 的關聯報銷單，只顯示暫估核對，不允許新增最終結清紀錄。
-- **已結清後鎖定（2026-08-12 定案並實作）**：當核對狀態為 `Settled`，預支款主檔、結清紀錄修改、標記不採用全部鎖住。這是 Amber 決定的保守做法：先避免已核對完的資料被覆寫，之後若真的需要更正，再另外開一條有權限、有原因、有提示的正式更正流程。
-- **「已核准報銷單選錯預支款」或「已核准後要取消該報銷單」**現在有正式流程處理了（見〈已定案的設計決策 / 報銷單生命週期擴充〉的作廢動作）——原本這條寫「不屬於結清紀錄不採用的範圍」的邊界依然成立，`IsVoided` 只長在 `CashAdvanceSettlementRecord` 上；主管作廢已核准報銷單後，若預支款尚未結清，可手動判斷相關結清紀錄要不要標記不採用；若已結清，目前先鎖住，未來需要另開正式更正流程。
+### Sessions 4–5（排隊中）
+- Session 4：CashAdvances（6 views）
+- Session 5：ExpenseReports（5 views，Details 最複雜）
+- 收尾：移除 `el-*` 過渡橋接與 Bootstrap 相容層；補 `.el-page--form` / `.el-page--narrow` 的 min-width
 
 ---
 
-## 開發環境狀態
+## Session 3 注意事項
 
-### user secrets
-
-`UserSecretsId` 是 `expenselite-local-dev`。目前需要兩個 key，**都不進 repo**：
-
-- `ConnectionStrings:ExpenseLite`——PostgreSQL 連線字串。
-- `Identity:SeedPassword`——bootstrap 建立第一個主管帳號 `Admin` 時用的密碼。沒設的話 app 仍可啟動，只是在 users 表為空時留下 warning 並跳過建帳號（等於沒有人進得去）。
-
-新機器要自己設一次：`dotnet user-secrets set "Identity:SeedPassword" "<密碼>"`。
-
-**注意**：`dotnet run` 若沒有 `ASPNETCORE_ENVIRONMENT=Development`（例如加了 `--no-launch-profile`），user secrets 不會被載入，會直接以「找不到連線字串」啟動失敗。
-
-### 開發 DB（桌機，scoop）
-
-- 來源：`scoop install postgresql`，版本 PostgreSQL 18.4。
-- binaries：`~\scoop\apps\postgresql\current\bin`（`current` 是 junction → `~\scoop\apps\postgresql\18.4-2`）。
-- data directory：`~\scoop\persist\postgresql\data`（專案外；`~\scoop\apps\postgresql\current\data` 是指向它的 junction）。
-- database：`expenselite_dev`；application user：`expenselite_app`。
-
-**現有資料（2026-08-07 全部清空重建，累積至 2026-08-09）**
-
-DB 於 2026-08-07 把 13 張表全 `TRUNCATE`（`__EFMigrationsHistory` 保留），目的是讓 Amber 看得到「空系統 → bootstrap → 建帳號」這條在有 fixture 時永遠看不到的路。
-
-目前有四個帳號：
-
-- `Admin` / 管理者 / Active / 主管 / **受保護（緊急存取帳號）**，密碼 `Admin123`（不再等於 `Identity:SeedPassword`——曾被本人改過）
-- `amber` / 王主管 / Active / 主管，密碼 `Amber123`
-- `April` / 小波 / Active / 主管，密碼 `April123`
-- `Butter` / 小奶油 / Active / 員工，密碼 `Butter123`——**這個原本是 `Pending`**，2026-08-08 拿掉該狀態時用 `UPDATE` 改成 `Active`（等同「主管啟用了他」）
-
-**已灌的 fixture**（本 session 2026-08-09 灌入，SQL 內容未落檔進 repo，需要重灌請跟 Claude 要一份；內容決策：Butter 而非 amber 是為了貼近實際情境——員工才是預支款常見的領款人，也能演示「主管作廢員工的已核准單」）：
-
-- 專案 `11111111-1111-1111-1111-111111111111`：「品牌識別更新案 - 綠地科技」，Active
-- 預支款 `22222222-2222-2222-2222-222222222222`：Butter 領 5000
-- 結清紀錄 `44444444-4444-4444-4444-444444444444`：員工繳回 500，仍被採用
-- 報銷單 `33333333-3333-3333-3333-333333333333`：Butter 申請、專案支出、個人預支綁 (2)、3500——**本 session 已在驗證 C 時被 April 實際作廢**，目前是 `Voided` 狀態；因此這筆預支款詳情頁現在會持續顯示「有 1 張已被作廢的報銷單」黃色 alert（也就是這條路本身變成「已作廢報銷 + 相關結清紀錄尚未處理」的活範例，別隨手把它復原）
-- 明細 `55555555-...`、審核紀錄 `66666666-...`（Admin 原本的核准 + April 的作廢，共 2 筆）
-- 另一張早於 fixture、2026-08-08 驗「審核人 ≠ 申請人」時留下的一般支出報銷單 `d4365203-66a3-4e4b-9602-74332de1ddcf`：員工墊款、300、申請人 amber、審核人 Admin、Approved。**本 session 拿它當側門測試 2 的靶**（amber POST /Void），結果被 Domain 擋、仍是 Approved
-
-**2026-08-16 額外灌的 Print 熱鬧版 fixture**（SQL 內容未落檔進 repo，需要重灌請跟 Claude 要一份；用途：驗證 Print 頁分組總表的顯示，資料涵蓋多申請人 / 支出類型 / 付款方式 / 專案）：
-
-- 4 張 Approved 報銷單，含各自的 details 與 review records：
-  - `aaaaaaaa-...` Butter 一般 / 員工墊款 / 8月交通費 / 800
-  - `bbbbbbbb-...` Butter 專案 / 個人預支（綁 fixture 預支款 22222222）/ 印刷材料 / 2500
-  - `cccccccc-...` amber 一般 / 零用金 / 辦公文具 / 350
-  - `dddddddd-...` April 專案 / 員工墊款 / 提案便當 / 1200
-- 另有一張來源不明的 Approved 單（Butter 830 元、專案支出、submitted 8/12）——可能是先前驗證留下的，跟 Print 熱鬧版剛好一起用，未清
-
-清空前有做 `pg_dump -Fc` 備份，**但放在當時的 session scratchpad（repo 外，且會隨 session 消失）**。除非 Amber 當時另外複製出去，否則視為沒有備份。舊資料裡的申請人 / 領款人 Guid 指向的是已被刪掉的 `manager`、`employee` 帳號，就算還原也會變成沒有人能修改的孤兒單。
-
-**已註冊為 Windows 服務 `postgresql-18`（2026-07-25）**
-
-- 啟動類型 `Automatic`：開機自動啟動、關機自動正常停止，不用再手動 `pg_ctl start`。
-- 執行帳號 `LocalSystem`（已確認 data 目錄 ACL 中 `NT AUTHORITY\SYSTEM` 有 FullControl）。
-- 服務執行檔：`...\current\bin\pg_ctl.exe runservice -N "postgresql-18" -D "C:\Users\Pinecone\scoop\persist\postgresql\data" -w`
-- 查詢：`Get-Service postgresql-18`（不需 admin）
-- 手動啟停：`Start-Service postgresql-18` / `Stop-Service postgresql-18`（需系統管理員權限的 PowerShell）
-- 還原註冊：`pg_ctl unregister -N postgresql-18`（需 admin）
-- 註冊時用的指令：`pg_ctl register -N postgresql-18 -D "C:\Users\Pinecone\scoop\persist\postgresql\data" -S auto`
-  - data path 刻意用 `scoop\persist` 真實路徑而非 `current` junction，避免 scoop 更新 app 版本時資料路徑跟著飄。
-
-**DB log**
-
-- `postgresql.conf` 的 `logging_collector` 已由 `off` 改為 `on`。原因：`pg_ctl register` 沒有 `-l` 參數，服務模式下不設定的話 log 只會進 Windows 事件檢視器。
-- log 位置：`~\scoop\persist\postgresql\data\log\postgresql-YYYY-MM-DD_HHmmss.log`，自動輪替。
-- **注意**：`postgresql.conf` 在 repo 之外，這個設定**不會進 Git**，換機器要自己設定一次。
-
-**已知風險**
-
-- 服務的執行檔走 `current` junction。若日後 `scoop update postgresql` 升上 PG 19 這類大版本，新 binary 會對到舊的 18 資料目錄，服務會啟動失敗（log 會明講版本不符）。屆時需要做資料的 major upgrade，**不是資料損壞**。
-- 筆電尚未做同樣的服務註冊，需要時要在筆電另外執行一次。
-
-### repo 內本機資料
-
-- `.localdb`、`.devtools.bak`、`.devdata.bak` 已在 `.gitignore` 忽略，不會進 Git。
-- 舊的 `.devtools.bak`、`.devdata.bak` 若確認 scoop 穩定，之後可由 Amber 決定是否刪除。
-
-### 跨機器注意
-
-- 其他機器 pull 後，若 DB 尚未套最新 migration（版本見〈專案現況 / build & DB〉），需執行 `dotnet build` 再 `dotnet ef database update`。**筆電目前還停在 `is_active` 那版 schema，不套 migration 會起不來。**
-- 筆電 DB 原則同樣是不放在專案資料夾內。
-
-### 疑難排解
-
-- 頁面出現 `Failed to connect to 127.0.0.1:5432` → 先查 `Get-Service postgresql-18` 是否 Running，再看 `data\log\` 最新 log。這是 DB 沒起來，**不是程式錯誤**。
-- 若 dev server 還在跑，Windows 會鎖住 `bin\Debug\net10.0\ExpenseLite.exe`；重新 `dotnet build` 前需先停掉該 process（`Get-Process ExpenseLite | Stop-Process`）。
-- **`dotnet ef` 加 `--no-build` 會拿到還沒重新編譯的 model snapshot。** 產生 migration 之後若直接 `dotnet ef database update --no-build`，會誤報 `PendingModelChangesWarning` 而失敗——因為新 migration 的 Designer 檔還沒被編進 DLL。**動過 model 或剛加完 migration，一律先 `dotnet build` 再跑 `dotnet ef`**。
-- **拿掉一個 enum 值時，「不用 migration」不等於「沒事」。** 存字串的 enum（`HasConversion<string>()`）少一個值，schema 完全不用動，`dotnet ef` 也不會產生任何東西——但 DB 裡若還留著那個字串的資料列，程式讀出來會對不到列舉值而炸，整個列表頁都打不開。**動 enum 之前先查一次 DB 有沒有殘留資料。**（2026-08-08 拿掉 `Pending` 時，DB 裡真的有一列。加 enum 值則安全——2026-08-09 加 `Voided/Cancelled` 完全沒動 DB。）
-- **`dotnet ef migrations add` 產生的欄位型別變更，順序常常會弄丟資料。** 它習慣「先 DropColumn 舊的、再 AddColumn 新的（帶預設值）」。凡是「換掉一個既有欄位」的 migration，**產生後一定要打開來看**，需要的話手改成「先加、再 `migrationBuilder.Sql` 換算、最後才砍」（範例見 `20260807090203_ReplaceUserIsActiveWithStatus`）。
-- `dotnet run` 會被 `Properties/launchSettings.json` 的 `applicationUrl` 覆蓋，**`ASPNETCORE_URLS` 環境變數不會生效**；預設 http 是 `localhost:5080`。要指定別的 port 得加 `--no-launch-profile`（但那樣就不會載入 user secrets，見〈user secrets〉）。
-- 註冊 / 啟停服務需要系統管理員權限；一般 session 權限不足時會需要 UAC 確認。
-- `git diff --check` 或 `git add` 可能出現 LF/CRLF 提醒，是 Windows 換行格式提示，不是程式錯誤。
-- **用 PowerShell 直接把含中文的 SQL 傳給 `psql -c` 會噴 `invalid byte sequence for encoding "UTF8"`。** 要下含中文的查詢，先 `Set-Content -Encoding UTF8` 寫成 `.sql` 檔再用 `psql -f` 執行；或者查詢裡只用英文別名。另外 PowerShell 的跳脫規則會吃掉 `"` ——含雙引號識別字（如 `"__EFMigrationsHistory"`）的 SQL 要放進單引號變數再傳。
-- **`psql` 不要讓它有機會問密碼**，否則會卡住直到 timeout。從 user secrets 取出連線字串裡的密碼設成 `$env:PGPASSWORD`，並加 `-w`（絕不提示）。
-- 用 PowerShell 對 HTML 內容做中文 `-match` 比對可能因編碼而誤判；驗證資料狀態要直接查 DB，不要信 HTML 比對結果。**若要比對頁面文字，把回應存成檔案再讀。** 另注意 Razor 會把 `@` 運算式輸出的中文編成 `&#x....;` 實體（比對前要先 `[System.Net.WebUtility]::HtmlDecode`），`.cshtml` 裡的字面文字則是原始 UTF-8——兩者比對方式不同。
-- **用 `Invoke-WebRequest` 驗權限會踩兩個坑。** 一是不加 `-MaximumRedirection 0` 的話會自動跟隨轉址，權限被擋時最後拿到的是 AccessDenied 那頁的 **200**，看起來像「沒擋住」；二是**加了 `-MaximumRedirection 0` 它會直接丟例外**（`The maximum redirection count has been exceeded`）而不是把 302 回給你。**比較可靠的做法是改用 `HttpClient` 搭 `HttpClientHandler { AllowAutoRedirect = $false; CookieContainer = ... }`**，自己讀 `StatusCode` 與 `Headers.Location`，順便也能把回應原始 bytes 寫檔避免編碼問題。
-- **EF Core 的 `IQueryable` 查詢不要呼叫私有 C# helper method。** 2026-08-12 `/Projects` 曾因 `EfExpenseReportRepository.IsUnfinished(x.Status)` 放在 LINQ-to-DB 查詢中而炸 `could not be translated`。要嘛把 enum whitelist 直接寫在 query expression 內，要嘛明確切到 in-memory（但列表統計這類 DB group query 不該切）。
-- **測試腳本不要從列表頁的 HTML 推測「第幾列是誰」。** 使用者列表照狀態排序（啟用中在前、已停用沉底），**順序會隨你剛做的操作改變**；靠位置抓 UserId 會抓錯人（這個坑在階段 6 踩了兩次，一次把測試帳號誤停用、一次整輪測到錯的帳號）。**要嘛直接查 DB 拿 ID，要嘛從 HTML 用姓名對應。** 另外 PowerShell 的 `Where-Object` 只回一個結果時是純量不是陣列，`[0]` 會取到字串的第一個字元——要寫成 `@(...)[0]`。
-- Codex sandbox 執行 git 時可能看到 `C:\Users\Pinecone/.config/git/ignore` permission warning；是 sandbox 讀不到 repo 外 global ignore，不影響本 repo 狀態判讀。Amber 本機 PowerShell 沒有這個 warning。
-- `dotnet run` 若由 Codex sandbox 啟動，可能因 repo 外 `NuGet.Config` 權限被擋；可改用本機 PowerShell 或允許 Codex 在 sandbox 外啟動。
-
----
-
-## 待 Amber 決定 / 下一步
-
-### 權限與帳號工作（分 6 階段，**全部完成**）
-
-1. ✅ Identity 基礎建設
-2. ✅ 登入 / 登出
-3. ✅ 把手動輸入的人名改成登入者——申請人、審核人、結清處理人、不採用處理人
-4. ✅ **授權規則**
-   - ✅ **4a 純授權**——主管才能核准 / 退回 / 拒絕；預支款整塊限主管；只有申請人能修改 / 送審自己的草稿;專案建立 / 結案限主管
-   - ✅ **4b 預支款領款人模型**——領款人存 `PayeeUserId` + 姓名快照
-5. ✅ **員工只看自己的報銷單**——列表、詳情、修改頁、專案詳情頁的相關報銷單與統計數字都依 `ApplicantUserId` 過濾，主管看全部
-6. ✅ **帳號與使用者管理**——登入先驗密碼再判狀態、使用者管理頁（啟用 / 停用 / 改角色 / 重設密碼）、修改密碼頁、bootstrap 取代 seed，外加緊急存取帳號與登入告警
-
-**6 之後的修正（2026-08-08、2026-08-09、2026-08-12、2026-08-16）**：
-
-- ✅ 拿掉自助註冊改成主管建帳號、帳號狀態收斂為兩態（2026-08-08）。理由見〈已定案的設計決策 / 帳號生命週期〉。
-- ✅ 補上「審核人 ≠ 申請人」規則（2026-08-08）。主管自己送的單只能由另一位主管審。**前提是這間公司實際上有兩位主管**（老闆 + 老闆娘）；若哪天只剩一位在動的主管，他自己的單就沒人能審、也沒人能作廢，那時候需重新設計（「主管的單免審」或「必須另一位主管核」都得先決定制度）。〈應用面候補〉裡「只剩一位主管時給提示」就是為這情境留的預警。
-- ✅ **報銷單生命週期擴充**（2026-08-09）：主管作廢已核准單 + 申請人硬刪草稿 + 申請人軟刪退回單 + 復活。詳見〈已定案的設計決策 / 報銷單生命週期擴充〉與 `docs/architecture/expense-report-lifecycle.md`。**已於同日手動驗完 A（草稿硬刪）/ B（軟刪＋復活）/ C（作廢已核准單，含作廢前的黃色警告 + 作廢後在報銷單頁 + 預支款頁的持續提示兩個時機）/ D（Delete 與 Void 側門）**，四塊全過、沒發現 bug。
-- ✅ **預支款已結清後鎖定**（2026-08-12）：預支款主檔、結清紀錄修改、標記不採用全部鎖住。Amber 已手動測過目前功能可正常使用。詳見〈已定案的設計決策 / 結清紀錄〉與 `docs/architecture/cash-advance-reconciliation.md`。
-- ✅ **修正 `/Projects` 專案列表錯誤**（2026-08-12）：`EfExpenseReportRepository` 的未完成報銷單統計改成 EF 可翻譯的 enum whitelist 條件，修掉 `IsUnfinished(...) could not be translated`。
-- ✅ **首次登入強制改密碼**（2026-08-16）—— 詳見 [首次登入強制改密碼](../docs/architecture/user-accounts.md#首次登入強制改密碼)
-- ✅ **只剩一位日常主管時給紅色 alert**（2026-08-16）—— 詳見 [只剩一位日常主管時的提示](../docs/architecture/user-accounts.md#只剩一位日常主管時的提示)
-- ✅ **主管不能停用 / 降級自己**（2026-08-16）—— 詳見 [順帶擋掉主管對自己動](../docs/architecture/user-accounts.md#順帶擋掉主管對自己動)
-- ✅ **列印報表**（2026-08-16）：`/ExpenseReports/Print?from=&to=` 一頁兩用——員工整理已核准報銷單交出納對照、主管看月度全公司支出。頂部 4 分組總表（員工版隱藏「按申請人」）+ 底部依申請人分卡。`@media print` CSS + `window.print()`，零 NuGet 套件。詳見〈已完成功能 / 列印報表〉與 `docs/architecture/list-filtering-queries.md` 的〈列印報表：同一種思路的另一個例子〉。
-- ✅ **畫面改版（2026-08-30）**：套用 expenselite 設計系統。25 支 Razor view 全數換新版式（淡青底功能列、留白分隔、狀態色系統一）；`expenselite.css` 取代 Bootstrap 預設樣式為主要視覺（Bootstrap CSS 暫留，JS 保留）。首頁實作「等你處理的事」待辦清單（`HomeAppService` / `HomePageDto` / `HomeTodoDto`）：主管看待審報銷單 / 預支款待結清 / 作廢未收拾，員工看退回單 / 草稿 / 預支款剩餘。補 `UnfinishedCount`、`AwaitingReviewCount`（`ExpenseReportListPageDto`）與 `VoidedRelatedReportCount`（`CashAdvanceListItemDto`）。`MapStaticAssets().AllowAnonymous()` 修正 fallback policy 攔截靜態檔案的問題。源素材保留在 `expenselite/`（`.csproj` 已排除 Razor 編譯）。
-
-### 應用面候補（尚未排序）
-
-- **UI 用詞**：詳情頁「不採用」按鈕與狀態欄的受詞是隱藏的，容易被讀成「整張單被註銷」。考慮把按鈕改成「不採用此筆結清」、狀態欄的「不採用」改成「不計入核對」。Amber 尚未決定。
-- **附件 / 發票照片上傳** — **2026-08-16 Amber 決定不做**（記著避免下次又提議）。理由：涉及檔案儲存 / 大小限制 / 安全性，本階段範圍取捨掉。
-- 若未來真的要做沖銷、付款憑證或出納日記帳，需另開會計帳範圍設計，**不建議混進第一階段**。
-
-### 開發環境待辦
-
-- 筆電也做一次 PostgreSQL 服務註冊與 `logging_collector` 設定，並設 `Identity:SeedPassword`；pull 後要記得套 migration。
-- 兩台都穩定後，再考慮清掉遠端舊分支 `origin/chore/dev-env-scoop`、`origin/chore/laptop-postgres-env`。**刪遠端分支屬不可逆操作，先確認再動。**
-- 桌機舊 portable 備份 `.devtools.bak`、`.devdata.bak` 仍保留；**刪除前需 Amber 明確確認**。
+- **`el-*` 過渡橋接：本 session 不要動**，等所有 view 全改完後一次移除
+- **`WarningMessage` TempData**：機制保留但目前無任何使用者，不要清掉
+- **已知待補（等全部改完再做）**：`.el-page--form` / `.el-page--narrow` 缺 `min-width`，縮小時部分表單頁會破版
 
 ---
 
 ## 本檔維護紀律
 
-- **每項資訊只有一個出處。** 不在多處重述同一件事——重複的地方遲早只更新其中一處，變成互相矛盾。
-- 需要交叉引用時，用「見〈某章節〉」指過去，不要複製內容。
-- 更新時先刪過期內容，再寫新內容；不要讓做完的待辦跟有效待辦並存。
-- **被推翻的決策要留一句「為什麼推翻」**（見〈預支款與零用金〉、〈專案與代墊〉），否則下一個 session 很可能重新提議一次同樣的設計。
-- **架構原理寫進 `/docs/architecture/`，本檔只留結論與紅線並指過去。** 本檔會被反覆改寫，長篇理由留在這裡遲早被洗掉。
-- **不放「當下瞬間狀態」**：dev server 開著沒、port 有沒有在聽、最新 commit hash、有沒有未 commit 變更——這些下次開工就過期了，該現查（`git status` / `git log` / `Get-Service`）。本檔尤其不記錄自己的 commit hash，因為 commit 發生在寫檔之後，寫下去當下就是錯的。
+- 每項資訊只有一個出處，需要交叉引用時用「見 CONTEXT.md §某節」指過去，不要複製內容
+- 更新時先刪過期內容，再寫新內容；做完的項目不要留在待辦旁邊
+- **不放瞬間狀態**：dev server 開著沒、port 有沒有在聽、有沒有未 commit 變更——這些該現查（`git status` / `Get-Service`）
+- 被推翻的決策要留一句「為什麼推翻」（詳細理由寫進 CONTEXT.md 或 `/docs/architecture/`）
