@@ -8,41 +8,79 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — @appName</title>
-    <link rel="stylesheet" href="~/css/expenselite.css" asp-append-version="true" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
-<div class="el-shell">
-    <nav class="el-nav">
-        <a class="el-nav-brand" asp-controller="Home" asp-action="Index">@appName</a>
-        <a asp-controller="Home" asp-action="Index" aria-current="@Current("Home")">首頁</a>
-        <a asp-controller="ExpenseReports" asp-action="Index" aria-current="@Current("ExpenseReports")">報銷單</a>
-        <a asp-controller="CashAdvances" asp-action="Index" aria-current="@Current("CashAdvances")">預支款</a>
-        <a asp-controller="Projects" asp-action="Index" aria-current="@Current("Projects")">專案</a>
+
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <a class="name" asp-controller="Home" asp-action="Index">@appName</a>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a asp-controller="Home" asp-action="Index" aria-current="@Current("Home")">
+            <svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/></svg>
+            首頁
+        </a>
+        <a asp-controller="ExpenseReports" asp-action="Index" aria-current="@Current("ExpenseReports")">
+            <svg viewBox="0 0 24 24"><path d="M7 3h10v18l-5-3-5 3V3z"/><path d="M9 8h6M9 12h6"/></svg>
+            報銷單
+        </a>
+        <a asp-controller="CashAdvances" asp-action="Index" aria-current="@Current("CashAdvances")">
+            <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M8 3v4"/></svg>
+            預支款
+        </a>
+        <a asp-controller="Projects" asp-action="Index" aria-current="@Current("Projects")">
+            <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3V7z"/></svg>
+            專案
+        </a>
         @if (User.IsManager())
         {
-            <a asp-controller="ExpenseCategories" asp-action="Index" aria-current="@Current("ExpenseCategories")">類別</a>
-            <a asp-controller="Users" asp-action="Index" aria-current="@Current("Users")">使用者</a>
+            <a asp-controller="ExpenseCategories" asp-action="Index" aria-current="@Current("ExpenseCategories")">
+                <svg viewBox="0 0 24 24"><path d="M12 3 3 8.5 12 14l9-5.5L12 3z"/><path d="M3 15.5 12 21l9-5.5"/></svg>
+                類別
+            </a>
+            <a asp-controller="Users" asp-action="Index" aria-current="@Current("Users")">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/></svg>
+                使用者
+            </a>
         }
-        <partial name="_LoginPartial" />
     </nav>
-    <div class="el-rule"></div>
 
-    <main>
-        @RenderBody()
-    </main>
-    @* 資料使用說明不是日常操作，不該佔功能列的位置——放頁尾，需要時找得到就好。
-       中間的分隔點由 .el-foot 的 gap 與 ::before 處理，不要在標記裡打「·」。 *@
-    <footer class="el-foot">
-        <span>© @DateTime.Now.Year @appName</span>
-        <a asp-controller="Home" asp-action="Privacy">資料使用說明</a>
-    </footer>
+    <div class="sidebar-footer">
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="sidebar-footer-user">@User.GetDisplayName()</div>
+            <div class="sidebar-footer-role">@(User.IsManager() ? "主管" : "員工")</div>
+            <div class="sidebar-footer-links">
+                <a asp-controller="Account" asp-action="ChangePassword">修改密碼</a>
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    <button type="submit">登出</button>
+                </form>
+            </div>
+        }
+    </div>
+</aside>
+
+<div class="main">
+    @if (User.IsProtectedAccount())
+    {
+        <div class="break-glass-banner">
+            <strong>緊急存取帳號</strong>
+            <span>你正在使用系統的緊急存取帳號。日常作業請登出後改用自己的帳號。</span>
+        </div>
+    }
+    @RenderBody()
 </div>
+
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
 
 @functions {
-    // 讓目前所在的模組在功能列上變青色。aria-current 同時也是無障礙標記。
     private string? Current(string controller)
         => string.Equals(ViewContext.RouteData.Values["controller"] as string, controller, StringComparison.OrdinalIgnoreCase)
             ? "page" : null;

@@ -1,7 +1,6 @@
 @inject IConfiguration Config
 @{
     var appName = Config["App:Name"] ?? "報銷系統";
-    // \n 會被 .el-login-tagline 的 white-space:pre-line 渲染成換行
     var appTagline = Config["App:Tagline"] ?? "員工墊款、個人預支與零用金支付的申請、審核與核對。\n帳號由主管建立。";
 }
 <!DOCTYPE html>
@@ -10,16 +9,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] — @appName</title>
-    <link rel="stylesheet" href="~/css/expenselite.css" asp-append-version="true" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body>
-<div class="el-login">
-    <div class="el-login-brand">
-        <h1 class="el-login-wordmark">@appName</h1>
-        <div class="el-rule"></div>
-        <p class="el-login-tagline">@appTagline</p>
+<body class="login-body">
+<div class="login-split">
+    <div class="login-panel login-brand-panel">
+        <h1 class="login-brand-name">@appName</h1>
+        <div class="login-gold-bar"></div>
+        <p class="login-tagline">@appTagline</p>
     </div>
-    <div class="el-login-panel">
+    <div class="login-panel login-form-panel">
         @RenderBody()
     </div>
 </div>
