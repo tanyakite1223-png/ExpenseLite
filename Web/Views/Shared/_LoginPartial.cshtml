@@ -1,8 +1,0 @@
-@* 功能列右側：目前登入者與登出。 *@
-@if (User.Identity?.IsAuthenticated == true)
-{
-    <span class="el-nav-user">@User.GetDisplayName()@(User.IsManager() ? "．主管" : "")</span>
-    <form asp-controller="Account" asp-action="Logout" method="post">
-        <button type="submit" class="btn btn-ghost">登出</button>
-    </form>
-}

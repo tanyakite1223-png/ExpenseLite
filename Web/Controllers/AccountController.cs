@@ -50,6 +50,8 @@ public sealed class AccountController : Controller
 
         if (!ModelState.IsValid)
         {
+            ModelState.Clear();
+            ModelState.AddModelError(string.Empty, InvalidCredentialsMessage);
             return View(form);
         }
 

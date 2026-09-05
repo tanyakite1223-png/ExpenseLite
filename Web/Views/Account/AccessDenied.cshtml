@@ -3,10 +3,14 @@
 }
 
 <div class="el-page el-page--form">
-    <h1 class="el-title">沒有權限</h1>
-    <div class="el-notice el-notice--warn">
-        你目前的角色不能執行這個操作。如果覺得這是設定錯誤，請找主管確認你的角色。
+    <div class="el-access-denied-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 4 6v5.5C4 16.1 7.4 20.4 12 22c4.6-1.6 8-5.9 8-10.5V6L12 2z"/>
+            <path d="M9 12l2 2 4-4"/>
+        </svg>
     </div>
+    <h1 class="el-title">沒有權限</h1>
+    <p class="el-lede">你目前的角色不能執行這個操作。如果覺得這是設定錯誤，請找主管確認你的角色。</p>
     <div class="el-actions">
         <a class="btn btn-secondary" asp-controller="Home" asp-action="Index">回首頁</a>
     </div>

@@ -6,7 +6,7 @@
     var returnUrl = ViewData["ReturnUrl"] as string;
 }
 
-<div>
+<div class="login-form-body">
     <h2 class="el-panel-title">登入</h2>
 
     @if (TempData["SuccessMessage"] is string successMessage)
@@ -15,12 +15,9 @@
     }
 
     <form asp-action="Login" asp-route-returnUrl="@returnUrl" method="post" class="el-fields">
-        <div asp-validation-summary="ModelOnly" class="el-error"></div>
-
         <div class="field">
             <label asp-for="UserName">帳號</label>
             <input id="UserName" name="UserName" class="input" autocomplete="username" autofocus />
-            <span asp-validation-for="UserName" class="el-error"></span>
         </div>
 
         <div class="field">
@@ -29,7 +26,6 @@
             <span class="el-password">
                 <input asp-for="Password" class="input" type="password" autocomplete="current-password" data-el-password />
             </span>
-            <span asp-validation-for="Password" class="el-error"></span>
         </div>
 
         <label class="radio">
@@ -38,6 +34,8 @@
             <span>記住我</span>
         </label>
 
+        <div asp-validation-summary="All" class="el-error"></div>
+
         <button type="submit" class="btn btn-primary btn-block">登入</button>
     </form>
 
@@ -45,6 +43,5 @@
 </div>
 
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
     <script src="~/js/el-password-toggle.js" asp-append-version="true"></script>
 }
