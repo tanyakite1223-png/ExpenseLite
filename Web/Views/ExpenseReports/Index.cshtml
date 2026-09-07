@@ -99,8 +99,10 @@
                     <td><span class="tag el-status @StatusClass(report.Status)">@StatusText(report.Status)</span></td>
                     <td class="num">@report.TotalAmount.ToString("N2")</td>
                     <td class="nowrap el-readonly">@report.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</td>
-                    <td class="num">
-                        <a class="btn btn-ghost" asp-action="Details" asp-route-id="@report.Id">檢視</a>
+                    <td>
+                        <div class="el-cell-actions">
+                            <a class="btn btn-ghost" asp-action="Details" asp-route-id="@report.Id">檢視</a>
+                        </div>
                     </td>
                 </tr>
             }
