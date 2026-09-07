@@ -36,7 +36,7 @@
             <div class="field">
                 <label asp-for="CashAdvanceForm.Amount">預支金額</label>
                 <input asp-for="CashAdvanceForm.Amount"
-                       class="input @(Model.CashAdvance.CanEditAmount ? "" : "el-readonly")"
+                       class="input @(Model.CashAdvance.CanEditAmount ? null : "el-readonly")"
                        inputmode="decimal"
                        readonly="@(!Model.CashAdvance.CanEditAmount)" />
                 @if (!Model.CashAdvance.CanEditAmount)
