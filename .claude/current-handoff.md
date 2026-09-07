@@ -3,13 +3,15 @@
 > 跨 session 接力用。每個 Claude Code session 開始時先讀此檔，結束時更新此檔（舊內容歸檔到 `.claude/handoff-archive/`）。
 > 功能清單、架構 pattern、設計決策、開發環境詳情 → `.claude/CONTEXT.md`
 
-> 最後更新：2026-09-07 — 版型改版 Session 3–5 完成
+> 最後更新：2026-09-07 — 版型改版全部完成（含收尾）
 
 ---
 
 ## 現況
 
-**版型改版完成 Session 1–5**，下一步是收尾。
+**版型改版 Session 1–5 + 收尾全部完成。** `site.css` 已是乾淨狀態，無過渡期包袱。
+
+下一步由 Amber 決定（新功能 / 改既有功能 / 其他）。
 
 ---
 
@@ -21,50 +23,25 @@
 
 ---
 
-## 版型改版進度
+## 版型現況
 
-**設計參考：** `463977.jpg`（專案根目錄，未進 repo）
+設計語言：左側固定 sidebar（220px，深海軍藍 #1C2333 + 金色 #C99A3C）+ 右側主內容區（淺灰底）。
 
-### Session 1（2026-09-05，完成）
-- `wwwroot/css/site.css`：全新 sidebar 設計語言（深海軍藍 #1C2333 + 金色 #C99A3C）
-  - `el-*` 元件類別保留作過渡橋接；Bootstrap 相容層同樣保留
-- `_Layout.cshtml`：sidebar 結構
-- `_LayoutLogin.cshtml`：左深色品牌欄（固定 520px）+ 右白色表單
+`wwwroot/css/site.css` 結構：
+- `:root` 色系變數（`--color-*`、`--navy-*` 等）已全部升為正式，無「過渡期」標記
+- Components 區塊含 `btn-sm`、`btn-danger`、`btn-outline-danger`（從 Bootstrap 相容層移入）
+- Bootstrap 相容層已移除（2026-09-07）
+- `.el-page--form`：`max-width: 640px; min-width: 400px`
+- `.el-page--narrow`：`max-width: 720px; min-width: 480px`
 
-### Session 2（2026-09-05，完成）
-- `Web/Views/Shared/_LoginPartial.cshtml`：刪除
-- `Web/Views/Shared/Error.cshtml`：移除 `el-lede--single`；`el-facts` 補 `el-facts--nowrap`
-- `Web/Views/Account/Login.cshtml`：input / button 固定 300px；錯誤集中在按鈕上方；移除 `_ValidationScriptsPartial`
-- `Web/Views/Account/ChangePassword.cshtml`：`class=""` 空屬性改 `null`
-- `Web/Views/Account/AccessDenied.cshtml`：補紅色盾牌 SVG icon；說明改 `el-lede`
-- `Web/Views/Home/Index.cshtml`：移除過期規劃注解
-- `Web/Controllers/AccountController.cs`：Login POST 統一回「帳號或密碼不正確。」
-- `wwwroot/css/site.css`：補 `.login-form-body`、`.el-facts--nowrap`、`.el-access-denied-icon`
-
-### Session 3（2026-09-07，完成）
-- Projects / Users 三個 view 各自確認對齊，無需改動
-- `Web/Views/ExpenseCategories/Create.cshtml`：補 `el-page--form`、`el-title--form`、返回連結、`_ValidationScriptsPartial`；validation-summary 移至 `el-fields` 外；label 欄縮為 50px（單欄表單不適合標準 76px）；input 加 `max-width: 240px`
-
-### Session 4（2026-09-07，完成）
-- CashAdvances 六個 view 確認對齊，無需改動
-- `Web/Views/CashAdvances/Edit.cshtml`：`class=""` 空屬性改 `null`
-
-### Session 5（2026-09-07，完成）
-- ExpenseReports Create / Edit / Details / Print 確認對齊，無需改動
-- `Web/Views/ExpenseReports/Index.cshtml`：最後一欄 `class="num"` 改為 `el-cell-actions`
-- `Web/Views/ExpenseReports/Print.cshtml`：更新過期注解（expenselite.css → site.css）
-
-### 收尾（下一步）
-- 移除 `site.css` 內的 `el-*` 過渡橋接變數與 Bootstrap 相容層
-- 補 `.el-page--form` / `.el-page--narrow` 的 `min-width`（縮小視窗時表單頁不破版）
+登入頁獨立版型（`_LayoutLogin.cshtml`）：左深色品牌欄（520px）+ 右白色表單。
 
 ---
 
-## 收尾注意事項
+## 注意事項
 
-- `el-*` 過渡橋接：CSS 變數區塊開頭有注解「view 改完後移除」，連同 Bootstrap 相容層（最底部）整段清掉
-- `ExpensoReports/Print.cshtml`：print 樣式已在 `site.css` 內；收尾時確認 `expenselite.css` 可否整支移除（目前 .gitignore 已排除 `attachments/`，無上傳檔案洩漏疑慮）
 - `WarningMessage` TempData：機制保留，無任何使用者，不要清掉
+- `expenselite.css`：若此檔存在於本機，可手動刪除（已被 .gitignore 排除，不進 repo）
 
 ---
 
