@@ -1,5 +1,5 @@
 /* site.css — ExpenseLite 主樣式
-   Sidebar 版型 + el-* 元件（過渡期保留，各 session 更新 view 後逐步移除）+ Bootstrap 相容層 */
+   Sidebar 版型 + el-* 元件系統 */
 
 /* ══════════════════════════════════════════════════════════
    CSS 變數
@@ -21,7 +21,7 @@
   --text-body: #4B5566;
   --text-hint: #8A93A2;
 
-  /* el-* 過渡期色系（view 改完後移除） */
+  /* 色系 */
   --color-bg: #F2F3F5;
   --color-surface: #FFFFFF;
   --color-text: #1F2430;
@@ -307,6 +307,11 @@ figcaption { font-size: 11px; margin-top: var(--space-1); color: var(--text-hint
 .btn-ghost:hover { background: rgba(24,115,180,0.10); }
 .btn-icon { width: 36px; height: 36px; padding: 0; }
 .btn-block { width: 100%; margin-top: var(--space-2); }
+.btn-sm { font-size: 13px; padding: 6px 12px; }
+.btn-danger { background: var(--color-accent-2); color: #fff; border-color: transparent; }
+.btn-danger:hover { background: var(--color-accent-2-700); }
+.btn-outline-danger { border-color: var(--color-divider); color: var(--color-accent-2-700); background: transparent; }
+.btn-outline-danger:hover { background: var(--color-accent-2-100); }
 
 /* — forms — */
 .field > label {
@@ -408,8 +413,8 @@ textarea.input { min-height: 90px; resize: vertical; }
 
 /* — 版面骨架 — */
 .el-page{padding:var(--space-6) var(--space-8) calc(var(--space-8) * 1.4)}
-.el-page--narrow{max-width:720px}
-.el-page--form{max-width:640px}
+.el-page--narrow{max-width:720px;min-width:480px}
+.el-page--form{max-width:640px;min-width:400px}
 
 /* — 頁首 — */
 .el-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-8);margin-top:var(--space-4)}
@@ -747,42 +752,6 @@ textarea.input.el-desc{min-height:66px}
 
 /* — 核取方塊 — */
 .radio .dot.square{border-radius:var(--radius-md)}
-
-/* ══════════════════════════════════════════════════════════
-   Bootstrap 相容層（views 改完後移除）
-   ══════════════════════════════════════════════════════════ */
-.form-control,.form-select{
-  width:100%;min-height:36px;padding:6px 10px;font:inherit;font-size:14px;
-  color:var(--color-text);
-  background:var(--color-surface);
-  border:1px solid var(--color-divider);border-radius:var(--radius-md);
-}
-.form-control:hover,.form-select:hover{border-color:var(--color-neutral-400)}
-.form-control:focus-visible,.form-select:focus-visible{border-color:var(--color-accent);outline-offset:0}
-textarea.form-control{min-height:90px;resize:vertical}
-.form-label{display:block;font-size:12px;margin-bottom:5px;color:var(--color-neutral-700)}
-.form-text{font-size:12px;color:var(--color-neutral-700);margin-top:5px;text-wrap:pretty}
-.btn-outline-secondary,.btn-outline-primary{border-color:var(--color-divider);color:var(--color-text);background:transparent}
-.btn-outline-secondary:hover,.btn-outline-primary:hover{background:var(--color-neutral-200)}
-.btn-outline-danger{border-color:var(--color-divider);color:var(--color-accent-2-700);background:transparent}
-.btn-outline-danger:hover{background:var(--color-accent-2-100)}
-.btn-success{background:var(--color-accent);color:#fff;border-color:transparent}
-.btn-success:hover{background:var(--color-accent-600)}
-.btn-danger{background:var(--color-accent-2);color:#fff;border-color:transparent}
-.btn-danger:hover{background:var(--color-accent-2-700)}
-.btn-sm{font-size:13px;padding:6px 12px}
-.alert{padding:12px 14px;font-size:13px;border:0;border-left:3px solid var(--color-text);border-radius:0;background:var(--color-surface);color:var(--color-text)}
-.alert-success,.alert-info{border-left-color:var(--color-accent);background:var(--color-surface)}
-.alert-warning,.alert-danger{border-left-color:var(--color-accent-2);background:var(--color-accent-2-100);color:var(--color-accent-2-900)}
-.alert-secondary{border-left-color:var(--color-neutral-400);color:var(--color-neutral-800)}
-.badge{display:inline-flex;align-items:center;font-family:var(--font-heading);font-weight:var(--font-heading-weight);font-size:13px;padding:5px 12px;letter-spacing:0.04em;border-radius:calc(var(--radius-md) * 0.75)}
-.badge.bg-secondary{background:var(--color-accent-100);color:var(--color-accent-800)}
-.badge.bg-danger{background:var(--color-accent-2-100);color:var(--color-accent-2-800)}
-.badge.bg-light{background:var(--color-neutral-100);color:var(--color-neutral-800);border:0}
-.text-muted{color:var(--color-neutral-700)}
-.text-danger{color:var(--color-accent-2-700)}
-.table thead{background:var(--color-surface)}
-.table .text-end{font-variant-numeric:tabular-nums}
 
 /* ══════════════════════════════════════════════════════════
    列印
