@@ -1,4 +1,5 @@
 using ExpenseLite.Application.ExpenseReports;
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.Projects;
 
 namespace ExpenseLite.Application.Projects;
@@ -14,7 +15,8 @@ public sealed record ProjectListItemDto(
 public sealed record ProjectListPageDto(
     string Keyword,
     int TotalProjectCount,
-    IReadOnlyList<ProjectListItemDto> Projects);
+    IReadOnlyList<ProjectListItemDto> Projects,
+    PageInfo Paging);
 
 public sealed record ProjectOptionDto(
     Guid Id,
@@ -28,5 +30,8 @@ public sealed record ProjectDetailDto(
     ProjectStatus Status,
     int UnfinishedExpenseReportCount,
     int TotalExpenseReportCount,
+    /// <summary>相關報銷單中，狀態為 Approved 的總金額。獨立算好給 View，View 不該對分頁後的清單做加總。</summary>
+    decimal ApprovedExpenseReportAmount,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<ExpenseReportListItemDto> ExpenseReports);
+    IReadOnlyList<ExpenseReportListItemDto> ExpenseReports,
+    PageInfo Paging);

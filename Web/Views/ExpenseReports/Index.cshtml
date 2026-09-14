@@ -67,7 +67,7 @@
         </div>
     </form>
 
-    <div class="el-count">共 @Model.Reports.Count 筆．已取消的單預設不列出</div>
+    <div class="el-count">共 @Model.Paging.TotalItemCount 筆．已取消的單預設不列出</div>
 
     @if (Model.Reports.Count == 0)
     {
@@ -108,6 +108,7 @@
             }
             </tbody>
         </table>
+        <partial name="_Pagination" model="Model.Paging" />
     }
 </div>
 

@@ -17,10 +17,10 @@ public sealed class ExpenseCategoriesController : Controller
         _categories = categories;
     }
 
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(int page = 1, CancellationToken cancellationToken = default)
     {
-        var page = await _categories.ListAsync(cancellationToken);
-        return View(page);
+        var pageDto = await _categories.ListAsync(page, cancellationToken);
+        return View(pageDto);
     }
 
     public IActionResult Create()

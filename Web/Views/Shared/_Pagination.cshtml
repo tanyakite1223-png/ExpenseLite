@@ -1,0 +1,94 @@
+@model ExpenseLite.Application.Shared.PageInfo
+
+@* 分頁條：讀目前網址的 querystring（扣掉 page），組出各頁連結。
+   這樣不管是報銷單列表的一堆篩選欄位、還是專案列表的關鍵字，這個 partial 都不用知道有哪些篩選參數。 *@
+@if (Model.TotalPages > 1)
+{
+    var action = ViewContext.RouteData.Values["action"] as string;
+    var controller = ViewContext.RouteData.Values["controller"] as string;
+    var baseRouteValues = Context.Request.Query
+        .Where(kv => !string.Equals(kv.Key, "page", StringComparison.OrdinalIgnoreCase))
+        .ToDictionary(kv => kv.Key, kv => (object?)kv.Value.ToString());
+
+    string PageUrl(int pageNumber)
+    {
+        var routeValues = new Dictionary<string, object?>(baseRouteValues) { ["page"] = pageNumber };
+        return Url.Action(action, controller, routeValues) ?? "#";
+    }
+
+    <nav class="el-pagination" aria-label="分頁">
+        @if (Model.PageNumber > 1)
+        {
+            <a class="btn btn-ghost btn-sm" href="@PageUrl(Model.PageNumber - 1)">上一頁</a>
+        }
+        else
+        {
+            <span class="btn btn-ghost btn-sm el-pagination-disabled">上一頁</span>
+        }
+
+        <span class="el-pagination-pages">
+        @foreach (var pageNumber in PageNumbersToShow(Model.PageNumber, Model.TotalPages))
+        {
+            @if (pageNumber is null)
+            {
+                <span class="el-pagination-ellipsis">…</span>
+            }
+            else if (pageNumber == Model.PageNumber)
+            {
+                <span class="el-pagination-current" aria-current="page">@pageNumber</span>
+            }
+            else
+            {
+                <a href="@PageUrl(pageNumber.Value)">@pageNumber</a>
+            }
+        }
+        </span>
+
+        @if (Model.PageNumber < Model.TotalPages)
+        {
+            <a class="btn btn-ghost btn-sm" href="@PageUrl(Model.PageNumber + 1)">下一頁</a>
+        }
+        else
+        {
+            <span class="btn btn-ghost btn-sm el-pagination-disabled">下一頁</span>
+        }
+    </nav>
+}
+
+@functions {
+    // 頁數不多時全部列出；多的話只顯示目前頁前後各 1 頁，加上首尾頁，中間用「…」省略。
+    private static List<int?> PageNumbersToShow(int current, int total)
+    {
+        var pages = new List<int?>();
+        const int window = 1;
+
+        var start = Math.Max(1, current - window);
+        var end = Math.Min(total, current + window);
+
+        if (start > 1)
+        {
+            pages.Add(1);
+            if (start > 2)
+            {
+                pages.Add(null);
+            }
+        }
+
+        for (var i = start; i <= end; i++)
+        {
+            pages.Add(i);
+        }
+
+        if (end < total)
+        {
+            if (end < total - 1)
+            {
+                pages.Add(null);
+            }
+
+            pages.Add(total);
+        }
+
+        return pages;
+    }
+}

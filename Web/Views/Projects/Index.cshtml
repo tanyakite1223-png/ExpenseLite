@@ -44,7 +44,7 @@
 
     @if (!string.IsNullOrWhiteSpace(Model.Keyword))
     {
-        <div class="el-count">找到 @Model.Projects.Count 筆符合「@Model.Keyword」的專案</div>
+        <div class="el-count">找到 @Model.Paging.TotalItemCount 筆符合「@Model.Keyword」的專案</div>
     }
 
     @if (Model.Projects.Count == 0)
@@ -94,6 +94,7 @@
             }
             </tbody>
         </table>
+        <partial name="_Pagination" model="Model.Paging" />
     }
 </div>
 

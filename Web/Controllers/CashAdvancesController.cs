@@ -24,14 +24,16 @@ public sealed class CashAdvancesController : Controller
     public async Task<IActionResult> Index(
         string? keyword,
         CashAdvanceReconciliationStatus? reconciliationStatus,
-        CancellationToken cancellationToken)
+        int page = 1,
+        CancellationToken cancellationToken = default)
     {
-        var page = await _cashAdvances.ListPageAsync(
+        var pageDto = await _cashAdvances.ListPageAsync(
             new CashAdvanceListQuery(keyword, reconciliationStatus),
             User.ToCurrentUser(),
+            page,
             cancellationToken);
 
-        return View(page);
+        return View(pageDto);
     }
 
     [Authorize(Roles = ExpenseLiteRoles.Manager)]

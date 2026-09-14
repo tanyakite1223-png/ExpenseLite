@@ -1,3 +1,4 @@
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.Shared;
 
 namespace ExpenseLite.Application.Identity;
@@ -20,16 +21,22 @@ public sealed class UserAccountAppService
         _accounts = accounts;
     }
 
-    public async Task<IReadOnlyList<UserAccountDto>> ListAsync(
+    public async Task<UserAccountListPageDto> ListAsync(
+        int page = 1,
         CancellationToken cancellationToken = default)
     {
         var accounts = await _accounts.ListAllAsync(cancellationToken);
 
         // 已停用的沉到最後：他們多半已經離職，平常要找的是還在職的人。
-        return accounts
+        var ordered = accounts
             .OrderBy(StatusOrder)
             .ThenBy(x => x.DisplayName)
             .ToList();
+
+        var paging = PageInfo.Create(page, ordered.Count);
+        var items = ordered.Skip(paging.Skip).Take(paging.PageSize).ToList();
+
+        return new UserAccountListPageDto(items, paging);
     }
 
     public Task<UserAccountResult> CreateAsync(

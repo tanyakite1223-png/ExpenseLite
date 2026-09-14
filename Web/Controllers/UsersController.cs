@@ -21,9 +21,9 @@ public sealed class UsersController : Controller
         _userAccounts = userAccounts;
     }
 
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(int page = 1, CancellationToken cancellationToken = default)
     {
-        var accounts = await _userAccounts.ListAsync(cancellationToken);
+        var accounts = await _userAccounts.ListAsync(page, cancellationToken);
         ViewData["ActiveDailyManagerCount"] =
             await _userAccounts.CountActiveDailyManagersAsync(cancellationToken);
         return View(accounts);

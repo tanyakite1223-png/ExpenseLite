@@ -1,4 +1,4 @@
-@model IReadOnlyList<UserAccountDto>
+@model UserAccountListPageDto
 
 @{
     ViewData["Title"] = "使用者";
@@ -57,7 +57,7 @@
             </tr>
         </thead>
         <tbody>
-        @foreach (var account in Model)
+        @foreach (var account in Model.Accounts)
         {
             var isSelf = currentUserId == account.UserId;
             <tr>
@@ -134,6 +134,7 @@
         }
         </tbody>
     </table>
+    <partial name="_Pagination" model="Model.Paging" />
 
     <div class="el-page-foot el-page-foot--single">
         <span>改角色或停用之後，對方目前開著的瀏覽器最慢會在 30 分鐘內失效（Identity 重新驗證登入 cookie 的間隔）。</span>

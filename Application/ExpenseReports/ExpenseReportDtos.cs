@@ -1,3 +1,4 @@
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.CashAdvances;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Projects;
@@ -37,7 +38,8 @@ public sealed record ExpenseReportListPageDto(
     int UnfinishedCount,
     /// <summary>Submitted，依 viewer 可見度計算。</summary>
     int AwaitingReviewCount,
-    IReadOnlyList<ExpenseReportListItemDto> Reports);
+    IReadOnlyList<ExpenseReportListItemDto> Reports,
+    PageInfo Paging);
 
 public sealed record ExpenseReportDetailDto(
     Guid Id,

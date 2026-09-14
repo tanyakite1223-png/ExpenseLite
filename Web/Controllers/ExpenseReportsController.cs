@@ -40,14 +40,16 @@ public sealed class ExpenseReportsController : Controller
         ExpenseType? expenseType,
         ExpensePaymentMethod? paymentMethod,
         bool includeCancelled,
-        CancellationToken cancellationToken)
+        int page = 1,
+        CancellationToken cancellationToken = default)
     {
-        var page = await _expenseReports.ListPageAsync(
+        var pageDto = await _expenseReports.ListPageAsync(
             new ExpenseReportListQuery(keyword, status, expenseType, paymentMethod, includeCancelled),
             User.ToCurrentUser(),
+            page,
             cancellationToken);
 
-        return View(page);
+        return View(pageDto);
     }
 
     /// <summary>

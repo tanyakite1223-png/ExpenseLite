@@ -31,6 +31,7 @@ public sealed class ExpenseReportAppService
     public async Task<ExpenseReportListPageDto> ListPageAsync(
         ExpenseReportListQuery query,
         CurrentUser viewer,
+        int page = 1,
         CancellationToken cancellationToken = default)
     {
         var reports = await _reports.ListAsync(cancellationToken);
@@ -42,9 +43,15 @@ public sealed class ExpenseReportAppService
             .Where(x => ExpenseReportVisibility.CanBeViewedBy(x, viewer))
             .ToList();
 
-        var items = visible
+        var filtered = visible
             .Where(x => MatchesFilter(x, normalizedKeyword, query))
             .OrderByDescending(x => x.CreatedAt)
+            .ToList();
+
+        var paging = PageInfo.Create(page, filtered.Count);
+        var items = filtered
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
             .Select(x => MapListItem(x, projectNames.GetValueOrDefault(x.ProjectId ?? Guid.Empty)))
             .ToList();
 
@@ -63,7 +70,8 @@ public sealed class ExpenseReportAppService
             visible.Count,
             unfinishedCount,
             awaitingReviewCount,
-            items);
+            items,
+            paging);
     }
 
     public async Task<ExpenseReportDetailDto?> GetDetailsAsync(

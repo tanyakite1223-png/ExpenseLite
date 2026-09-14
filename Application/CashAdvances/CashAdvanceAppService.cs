@@ -27,20 +27,38 @@ public sealed class CashAdvanceAppService
     public async Task<CashAdvanceListPageDto> ListPageAsync(
         CashAdvanceListQuery query,
         CurrentUser viewer,
+        int page = 1,
         CancellationToken cancellationToken = default)
     {
         var list = await BuildListItemsAsync(viewer, cancellationToken);
         var normalizedKeyword = NormalizeKeyword(query.Keyword);
 
-        var items = list.Items
+        var filtered = list.Items
             .Where(x => MatchesFilter(x, normalizedKeyword, query.ReconciliationStatus))
             .ToList();
+
+        var paging = PageInfo.Create(page, filtered.Count);
+        var items = filtered.Skip(paging.Skip).Take(paging.PageSize).ToList();
 
         return new CashAdvanceListPageDto(
             normalizedKeyword,
             query.ReconciliationStatus,
             list.TotalCashAdvanceCount,
-            items);
+            items,
+            paging);
+    }
+
+    /// <summary>
+    /// 給首頁待辦聚合用：viewer 可見度過濾後的完整清單，不套用關鍵字 / 狀態篩選，也不分頁。
+    /// 跟 <see cref="ListPageAsync"/> 分開的原因是首頁要拿全部資料算待辦數量，
+    /// 分頁後的清單只有當頁 20 筆，拿來算數量會漏算。
+    /// </summary>
+    public async Task<IReadOnlyList<CashAdvanceListItemDto>> ListItemsForViewerAsync(
+        CurrentUser viewer,
+        CancellationToken cancellationToken = default)
+    {
+        var list = await BuildListItemsAsync(viewer, cancellationToken);
+        return list.Items;
     }
 
     /// <summary>

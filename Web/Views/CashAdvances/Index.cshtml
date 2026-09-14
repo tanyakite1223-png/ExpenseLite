@@ -58,7 +58,7 @@
 
     @if (HasFilter(Model))
     {
-        <div class="el-count">找到 @Model.CashAdvances.Count 筆符合篩選的預支款</div>
+        <div class="el-count">找到 @Model.Paging.TotalItemCount 筆符合篩選的預支款</div>
     }
 
     @if (Model.CashAdvances.Count == 0)
@@ -121,6 +121,7 @@
             }
             </tbody>
         </table>
+        <partial name="_Pagination" model="Model.Paging" />
     }
 </div>
 

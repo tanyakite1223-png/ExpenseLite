@@ -25,7 +25,7 @@
     <div class="el-stats">
         <div class="el-stat">
             <span class="el-stat-label">報銷單總數</span>
-            <span class="el-stat-value">@Model.ExpenseReports.Count</span>
+            <span class="el-stat-value">@Model.TotalExpenseReportCount</span>
         </div>
         <div class="el-stat">
             <span class="el-stat-label">未完成</span>
@@ -33,7 +33,7 @@
         </div>
         <div class="el-stat">
             <span class="el-stat-label">已核准金額</span>
-            <span class="el-stat-value">@Model.ExpenseReports.Where(x => x.Status == ExpenseReportStatus.Approved).Sum(x => x.TotalAmount).ToString("N0")</span>
+            <span class="el-stat-value">@Model.ApprovedExpenseReportAmount.ToString("N0")</span>
         </div>
     </div>
 
@@ -46,7 +46,7 @@
 
     <h2 class="el-kicker el-kicker--section">相關報銷單</h2>
 
-    @if (Model.ExpenseReports.Count == 0)
+    @if (Model.TotalExpenseReportCount == 0)
     {
         <div class="el-notice el-notice--quiet">這個專案目前沒有相關報銷單。</div>
     }
@@ -86,6 +86,7 @@
             }
             </tbody>
         </table>
+        <partial name="_Pagination" model="Model.Paging" />
     }
 </div>
 

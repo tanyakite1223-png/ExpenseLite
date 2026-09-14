@@ -1,5 +1,6 @@
 using ExpenseLite.Application.ExpenseReports;
 using ExpenseLite.Application.Identity;
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.ExpenseReports;
 using ExpenseLite.Domain.Projects;
 using ExpenseLite.Domain.Shared;
@@ -22,6 +23,7 @@ public sealed class ProjectAppService
     public async Task<ProjectListPageDto> ListAsync(
         CurrentUser viewer,
         string? keyword = null,
+        int page = 1,
         CancellationToken cancellationToken = default)
     {
         var projects = await _projects.ListAsync(cancellationToken);
@@ -34,13 +36,19 @@ public sealed class ProjectAppService
             cancellationToken);
         var normalizedKeyword = NormalizeKeyword(keyword);
 
-        var items = projects
+        var filtered = projects
             .Where(x => MatchesKeyword(x, normalizedKeyword))
             .OrderBy(x => x.Name)
+            .ToList();
+
+        var paging = PageInfo.Create(page, filtered.Count);
+        var items = filtered
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
             .Select(x => MapListItem(x, unfinishedReportCounts.GetValueOrDefault(x.Id)))
             .ToList();
 
-        return new ProjectListPageDto(normalizedKeyword, projects.Count, items);
+        return new ProjectListPageDto(normalizedKeyword, projects.Count, items, paging);
     }
 
     public async Task<IReadOnlyList<ProjectOptionDto>> ListActiveOptionsAsync(
@@ -58,6 +66,7 @@ public sealed class ProjectAppService
     public async Task<ProjectDetailDto?> GetDetailsAsync(
         Guid id,
         CurrentUser viewer,
+        int page = 1,
         CancellationToken cancellationToken = default)
     {
         var project = await _projects.GetByIdAsync(id, cancellationToken);
@@ -76,10 +85,20 @@ public sealed class ProjectAppService
             .Where(x => x.Status != ExpenseReportStatus.Cancelled)
             .ToList();
 
-        var reportItems = visibleReports
+        var orderedReports = visibleReports
             .OrderByDescending(x => x.CreatedAt)
+            .ToList();
+
+        var paging = PageInfo.Create(page, orderedReports.Count);
+        var reportItems = orderedReports
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
             .Select(x => MapExpenseReportListItem(x, project.Name))
             .ToList();
+
+        var approvedAmount = visibleReports
+            .Where(x => x.Status == ExpenseReportStatus.Approved)
+            .Sum(x => x.TotalAmount.Amount);
 
         return new ProjectDetailDto(
             project.Id,
@@ -88,8 +107,10 @@ public sealed class ProjectAppService
             project.Status,
             CountUnfinishedReports(visibleReports),
             visibleReports.Count,
+            approvedAmount,
             project.CreatedAt,
-            reportItems);
+            reportItems,
+            paging);
     }
 
     public async Task<Guid> CreateAsync(

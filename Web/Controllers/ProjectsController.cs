@@ -16,15 +16,15 @@ public sealed class ProjectsController : Controller
         _projects = projects;
     }
 
-    public async Task<IActionResult> Index(string? keyword, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(string? keyword, int page = 1, CancellationToken cancellationToken = default)
     {
-        var projects = await _projects.ListAsync(User.ToCurrentUser(), keyword, cancellationToken);
+        var projects = await _projects.ListAsync(User.ToCurrentUser(), keyword, page, cancellationToken);
         return View(projects);
     }
 
-    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Details(Guid id, int page = 1, CancellationToken cancellationToken = default)
     {
-        var project = await _projects.GetDetailsAsync(id, User.ToCurrentUser(), cancellationToken);
+        var project = await _projects.GetDetailsAsync(id, User.ToCurrentUser(), page, cancellationToken);
         if (project is null)
         {
             return NotFound();

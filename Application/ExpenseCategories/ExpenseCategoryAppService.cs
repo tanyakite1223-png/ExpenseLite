@@ -1,3 +1,4 @@
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.ExpenseCategories;
 using ExpenseLite.Domain.Shared;
 
@@ -12,16 +13,22 @@ public sealed class ExpenseCategoryAppService
         _categories = categories;
     }
 
-    public async Task<ExpenseCategoryListPageDto> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<ExpenseCategoryListPageDto> ListAsync(int page = 1, CancellationToken cancellationToken = default)
     {
         var categories = await _categories.ListAsync(cancellationToken);
 
-        var items = categories
+        var ordered = categories
             .OrderBy(x => x.Name)
+            .ToList();
+
+        var paging = PageInfo.Create(page, ordered.Count);
+        var items = ordered
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
             .Select(x => new ExpenseCategoryListItemDto(x.Id, x.Name, x.IsActive, x.CreatedAt))
             .ToList();
 
-        return new ExpenseCategoryListPageDto(items);
+        return new ExpenseCategoryListPageDto(items, paging);
     }
 
     public async Task<IReadOnlyList<string>> ListActiveNamesAsync(CancellationToken cancellationToken = default)

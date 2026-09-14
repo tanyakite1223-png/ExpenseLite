@@ -24,11 +24,7 @@ public sealed class HomeAppService
     {
         var reports = await _reports.ListAsync(cancellationToken);
 
-        var cashAdvancePage = await _cashAdvances.ListPageAsync(
-            new CashAdvanceListQuery(null, null),
-            viewer,
-            cancellationToken);
-        var cashAdvances = cashAdvancePage.CashAdvances;
+        var cashAdvances = await _cashAdvances.ListItemsForViewerAsync(viewer, cancellationToken);
 
         var todos = viewer.IsManager
             ? BuildManagerTodos(reports, cashAdvances, viewer)

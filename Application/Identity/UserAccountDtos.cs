@@ -1,3 +1,5 @@
+using ExpenseLite.Application.Shared;
+
 namespace ExpenseLite.Application.Identity;
 
 /// <summary>
@@ -16,6 +18,10 @@ public sealed record UserAccountDto(
     string Role,
     bool IsProtected,
     DateTime? LastSignedInAt);
+
+public sealed record UserAccountListPageDto(
+    IReadOnlyList<UserAccountDto> Accounts,
+    PageInfo Paging);
 
 /// <summary>
 /// 帳號操作的結果。

@@ -1,3 +1,4 @@
+using ExpenseLite.Application.Shared;
 using ExpenseLite.Domain.CashAdvances;
 
 namespace ExpenseLite.Application.CashAdvances;
@@ -37,7 +38,8 @@ public sealed record CashAdvanceListPageDto(
     string Keyword,
     CashAdvanceReconciliationStatus? ReconciliationStatus,
     int TotalCashAdvanceCount,
-    IReadOnlyList<CashAdvanceListItemDto> CashAdvances);
+    IReadOnlyList<CashAdvanceListItemDto> CashAdvances,
+    PageInfo Paging);
 
 public sealed record CashAdvanceOptionDto(
     Guid Id,
